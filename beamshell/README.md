@@ -56,14 +56,24 @@ the Linux-phone posture where the phone screen is the primary input (`../docs/12
 
 ## Put 3D media in place
 
-Default media dir is `./media` (or `$BEAMSHELL_MEDIA`). Drop in:
-- A **side-by-side** movie (filename containing `sbs`/`3d`/`stereo`) — e.g. `bbb_sbs.mp4`.
-- A **3D photo**: an `.mpo`, a side-by-side `.jpg`, or a stereo pair.
-The launcher tiles auto-pick the first matching file and show real thumbnails
-(left-eye crop for SBS sources; movie frames are grabbed via `ffmpeg` when it's
-installed and cached in `media/.thumbs/`). A clock floats above the tile arc,
-and the focused tile zooms slightly. With a Daydream controller connected, a
-glowing cursor dot shows where you're pointing.
+**Movies.** The "3D Movies" tile browses your library: `--library DIR`,
+`$BEAMSHELL_LIBRARY`, or — with zero setup — Ripsaw's `library_root`
+(`~/.config/ripsaw/config.json`). Jellyfin-style `Title (Year)` folders give the
+tiles their names and `poster.jpg`/`folder.jpg` art. Opening a title probes it
+through the **ripplay engine** (`ripplay` on PATH or `$RIPPLAY_BIN`): packed SBS
+files play directly in libmpv, while H.264 MVC (straight off a 3D Blu-ray rip),
+MV-HEVC, and over-under stream through `ripplay stream` as composed Full-SBS.
+Without ripplay installed, packed-SBS files still play via filename heuristics.
+
+**Photos.** The "3D Gallery" tile flips through every still it finds in the
+media dir + library (left/right arrows navigate): `.mpo`, `.jps`, wide SBS
+images, explicit `*_l`/`*_r` (or `*-left`/`*-right`) stereo pairs, and flat
+images; `.heic` spatial photos too with `pillow-heif` installed.
+
+The demo media dir also still works: default `./media` (or `$BEAMSHELL_MEDIA`).
+Thumbnails are cached under `~/.cache/beamshell/thumbs`. A clock floats above
+the tile arc, and the focused tile zooms slightly. With a Daydream controller
+connected, a glowing cursor dot shows where you're pointing.
 
 ## Run when the glasses are plugged in
 
