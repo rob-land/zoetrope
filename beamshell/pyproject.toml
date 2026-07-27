@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beamshell"
+version = "0.1.0"
+description = "A Nebula-like spatial shell for XREAL glasses on Linux (laptop + Wayland phone)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "beampro project" }]
+
+# Core (pure-logic) has NO runtime deps. These are for the GL/IO/app layers.
+dependencies = [
+    "moderngl>=5.8",
+    "glfw>=2.5",
+    "Pillow>=9.0",
+]
+
+[project.optional-dependencies]
+video = ["python-mpv>=1.0"]        # needs libmpv.so on the system
+hotplug = ["pyudev>=0.24"]         # for `beamshell watch`
+heic = ["pillow-heif>=0.13"]       # to read the Beam Pro's HEIC spatial stills
+controller = ["bleak>=0.21"]       # Google Daydream controller (BLE pointer)
+term = ["pyte>=0.8"]               # floating terminal app
+dev = ["pytest>=7"]
+
+[project.scripts]
+beamshell = "beamshell.main:main"
+
+[tool.setuptools.packages.find]
+include = ["beamshell*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

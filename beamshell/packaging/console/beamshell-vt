@@ -1,0 +1,36 @@
+#!/bin/bash
+# Root helper for beamshell-console.service: VT save/switch/restore.
+set -u
+STATE=/run/beamshell-console.prevvt
+VT=${BEAMSHELL_CONSOLE_VT:-8}
+
+case "${1:-}" in
+save-and-switch)
+    active=$(cat /sys/class/tty/tty0/active 2>/dev/null)   # e.g. "tty2"
+    prev=${active#tty}
+    # Don't clobber the saved VT if we're already on the kiosk VT (restart case).
+    if [ -n "$prev" ] && [ "$prev" != "$VT" ]; then
+        echo "$prev" > "$STATE"
+    fi
+    exec chvt "$VT"
+    ;;
+restore)
+    # The kiosk's processes live in a logind session scope (PAMName= moves them
+    # out of the service cgroup), so stopping the unit doesn't kill them. Kill
+    # every session on our VT via cgroup.kill before switching back.
+    while read -r sid _; do
+        tty=$(loginctl show-session "$sid" -p TTY --value 2>/dev/null)
+        if [ "$tty" = "tty$VT" ]; then
+            cg="/sys/fs/cgroup/user.slice/user-1000.slice/session-${sid}.scope/cgroup.kill"
+            [ -w "$cg" ] && echo 1 > "$cg"
+        fi
+    done < <(loginctl list-sessions --no-legend)
+    prev=$(cat "$STATE" 2>/dev/null)
+    rm -f "$STATE"
+    exec chvt "${prev:-2}"
+    ;;
+*)
+    echo "usage: beamshell-vt save-and-switch|restore" >&2
+    exit 2
+    ;;
+esac

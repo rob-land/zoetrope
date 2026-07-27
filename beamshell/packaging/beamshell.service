@@ -1,0 +1,27 @@
+# systemd --user service. Runs the hotplug watcher, which launches the shell
+# fullscreen on the glasses when they are plugged in and stops it on removal.
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp beamshell.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now beamshell.service
+#
+# The watcher approach ("watch") needs pyudev. Alternatively, the udev rule can
+# start this unit on plug and it can run `beamshell run --mode glasses` directly.
+
+[Unit]
+Description=beamshell — XREAL spatial shell (hotplug launcher)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# Use `watch` to self-manage plug/unplug, or `run --mode glasses` if started by udev.
+ExecStart=%h/.local/bin/beamshell watch
+Environment=BEAMSHELL_MEDIA=%h/Videos/3d
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

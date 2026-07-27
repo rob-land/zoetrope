@@ -1,0 +1,12 @@
+# Vendored third-party checkouts (large; clone from upstream instead)
+vendor/
+
+# Test media (large binaries; not source)
+beamshell/media/
+
+# Python build/test artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/

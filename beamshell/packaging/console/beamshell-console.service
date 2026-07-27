@@ -1,0 +1,34 @@
+# beamshell console mode: a dedicated sway kiosk session on VT8, outside GNOME.
+# Started by udev when XREAL glasses are plugged in (99-beamshell-console.rules),
+# stopped on unplug. GNOME's session on tty2 is suspended (not killed) meanwhile.
+#
+# Manual control:  sudo systemctl start|stop beamshell-console
+# Hotplug toggle:  touch|rm /etc/beamshell/console-autostart
+
+[Unit]
+Description=beamshell glasses console (sway kiosk on its own VT)
+# Only auto-launch when armed.
+ConditionPathExists=/etc/beamshell/console-autostart
+Conflicts=getty@tty8.service
+After=getty@tty8.service systemd-user-sessions.service
+
+[Service]
+Type=simple
+User=rob
+PAMName=login
+TTYPath=/dev/tty8
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty8
+UtmpMode=user
+# Remember the VT we came from, then switch to VT8 (runs as root: '+').
+ExecStartPre=+/usr/local/libexec/beamshell/beamshell-vt save-and-switch
+ExecStart=/usr/bin/sway -c /etc/beamshell/sway-kiosk.conf
+# Whatever way the session ends, put the user back on their previous VT.
+ExecStopPost=+/usr/local/libexec/beamshell/beamshell-vt restore
+TimeoutStopSec=10
+Restart=no

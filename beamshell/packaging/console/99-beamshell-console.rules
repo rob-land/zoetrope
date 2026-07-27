@@ -1,0 +1,17 @@
+# beamshell console mode — hotplug trigger.
+# XREAL glasses USB VID 0x3318, glasses PIDs 0x0423-0x0442 (One Pro = 0435/0436).
+# NOTE: the Beam Pro's own USB gadget is also VID 0x3318 (PID 0x0528) — the PID
+# match below MUST stay range-limited so plugging the phone doesn't start this.
+
+# Plug: start the console session (gated by /etc/beamshell/console-autostart).
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", \
+    ATTR{idVendor}=="3318", ATTR{idProduct}=="042?|043?|044[0-2]", \
+    TAG+="systemd", ENV{SYSTEMD_WANTS}+="beamshell-console.service"
+
+# Unplug: stop it (restores the previous VT via ExecStopPost).
+# Match on PRODUCT (vid/pid/rev, kernel-provided in the remove uevent itself, hex
+# without leading zeros) — ID_VENDOR_ID/ID_MODEL_ID are udev-DB props that proved
+# unreliable on remove.
+ACTION=="remove", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", \
+    ENV{PRODUCT}=="3318/42?/*|3318/43?/*|3318/44[0-2]/*", \
+    RUN+="/usr/bin/systemctl stop --no-block beamshell-console.service"

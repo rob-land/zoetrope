@@ -1,0 +1,11 @@
+# udev rules for XREAL glasses (USB vendor 0x3318).
+# Install: sudo cp 70-xreal-glasses.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+#
+# 1) Give the logged-in user access to the glasses' hidraw node (for direct IMU reads).
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3318", TAG+="uaccess", GROUP="input", MODE="0660"
+SUBSYSTEM=="usb", ATTR{idVendor}=="3318", TAG+="uaccess", MODE="0660"
+
+# 2) Optionally start the per-user shell service when glasses are attached.
+#    (Requires the systemd --user service installed; see packaging/beamshell.service.)
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="3318", TAG+="systemd", \
+    ENV{SYSTEMD_USER_WANTS}+="beamshell.service"
