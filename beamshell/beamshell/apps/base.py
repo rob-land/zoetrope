@@ -179,12 +179,16 @@ class App:
     id: str = "app"
     title: str = "App"
     accepts_text: bool = False     # True: keyboard text is routed to write_input
+    handles_nav: bool = False      # True: prev/next go to nav() instead of resize
 
     def panel(self) -> Panel:
         raise NotImplementedError
 
     def update(self, dt: float) -> None:
         pass
+
+    def nav(self, delta: int) -> None:
+        """prev/next while focused (only when handles_nav is True)."""
 
     def write_input(self, text: str) -> None:
         pass

@@ -109,6 +109,80 @@ def scan_movies(roots: list[str], limit: int = 200) -> list[Movie]:
     return out
 
 
+# --- photos -----------------------------------------------------------------
+
+PHOTO_EXTS = (".mpo", ".jps", ".jpg", ".jpeg", ".png", ".heic", ".heif")
+
+# name-suffix conventions for explicit left/right stereo pair files
+_PAIR_SUFFIXES = (("_l", "_r"), ("-l", "-r"), ("_left", "_right"), ("-left", "-right"))
+
+
+@dataclass
+class Photo:
+    path: str
+    right_path: str | None
+    title: str
+
+
+def pair_stereo_files(names: list[str]) -> list[tuple[str, str | None]]:
+    """Group a directory's photo filenames into (left, right-or-None)
+    entries by the usual L/R suffix conventions; case-insensitive."""
+    by_lower = {n.lower(): n for n in names}
+    used: set[str] = set()
+    out: list[tuple[str, str | None]] = []
+    for n in sorted(names):
+        low = n.lower()
+        if low in used:
+            continue
+        stem, ext = os.path.splitext(low)
+        matched = False
+        for ls, rs in _PAIR_SUFFIXES:
+            if stem.endswith(ls):
+                partner = by_lower.get(stem[: -len(ls)] + rs + ext)
+                if partner:
+                    out.append((n, partner))
+                    used.add(low)
+                    used.add(partner.lower())
+                    matched = True
+                break
+            if stem.endswith(rs) and by_lower.get(stem[: -len(rs)] + ls + ext):
+                used.add(low)   # right eye — folded into its left's entry
+                matched = True
+                break
+        if not matched:
+            out.append((n, None))
+            used.add(low)
+    return out
+
+
+def scan_photos(roots: list[str], limit: int = 500) -> list[Photo]:
+    """Walk for still photos, pairing explicit L/R files. MPO/JPS/wide-SBS
+    detection happens at view time (the viewer splits them itself)."""
+    seen: set[str] = set()
+    out: list[Photo] = []
+    for root in roots:
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            photos = [f for f in filenames
+                      if os.path.splitext(f)[1].lower() in PHOTO_EXTS
+                      and not f.lower().startswith(("poster.", "folder.", "cover."))]
+            for left, right in pair_stereo_files(photos):
+                p = os.path.join(dirpath, left)
+                real = os.path.realpath(p)
+                if real in seen:
+                    continue
+                seen.add(real)
+                title = os.path.splitext(left)[0]
+                out.append(Photo(
+                    path=p,
+                    right_path=os.path.join(dirpath, right) if right else None,
+                    title=title))
+                if len(out) >= limit:
+                    break
+    out.sort(key=lambda ph: ph.title.lower())
+    return out
+
+
 # --- ripplay engine seam ----------------------------------------------------
 
 def ripplay_bin() -> str | None:

@@ -128,3 +128,45 @@ def test_geometry_mono():
     fbo, stereo, aspect = library.playback_geometry(_report("mono", "direct"))
     assert stereo == "mono"
     assert aspect == pytest.approx(1920 / 1080)
+
+
+# --- photo scan + stereo pairing --------------------------------------------
+
+def test_pair_stereo_files_l_r_suffixes():
+    pairs = library.pair_stereo_files(
+        ["shot_l.jpg", "shot_r.jpg", "lone.jpg", "vac-left.png", "vac-right.png"])
+    d = {left: right for left, right in pairs}
+    assert d["shot_l.jpg"] == "shot_r.jpg"
+    assert d["vac-left.png"] == "vac-right.png"
+    assert d["lone.jpg"] is None
+    assert len(pairs) == 3  # right-eye files fold into their left entry
+
+
+def test_pair_stereo_files_case_insensitive():
+    pairs = library.pair_stereo_files(["A_L.JPG", "a_r.jpg"])
+    assert pairs == [("A_L.JPG", "a_r.jpg")]
+
+
+def test_scan_photos_skips_poster_art(tmp_path):
+    (tmp_path / "poster.jpg").touch()
+    (tmp_path / "beach.mpo").touch()
+    photos = library.scan_photos([str(tmp_path)])
+    assert [p.title for p in photos] == ["beach"]
+
+
+def test_scan_photos_pairs_and_titles(tmp_path):
+    (tmp_path / "trip_l.jpg").touch()
+    (tmp_path / "trip_r.jpg").touch()
+    photos = library.scan_photos([str(tmp_path)])
+    assert len(photos) == 1
+    assert photos[0].right_path.endswith("trip_r.jpg")
+
+
+# --- gallery navigation -----------------------------------------------------
+
+def test_gallery_next_index_wraps():
+    from beamshell.apps.photo import next_index
+    assert next_index(0, +1, 3) == 1
+    assert next_index(2, +1, 3) == 0
+    assert next_index(0, -1, 3) == 2
+    assert next_index(5, 0, 0) == 0

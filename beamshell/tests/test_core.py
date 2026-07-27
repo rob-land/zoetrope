@@ -472,7 +472,8 @@ class TestWindowManipulation(unittest.TestCase):
         from types import SimpleNamespace
 
         from beamshell import shell as sh
-        state = dict(mode=sh.APP, _app_scale=1.0, _app_dist=sh.APP_DIST_DEFAULT)
+        state = dict(mode=sh.APP, current=None, _app_scale=1.0,
+                     _app_dist=sh.APP_DIST_DEFAULT)
         state.update(attrs)
         return SimpleNamespace(**state)
 

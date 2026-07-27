@@ -17,7 +17,7 @@ from . import mathutil as m
 from .scene import CylinderLayout, LauncherScene, Panel, _wrap180
 from .stereo import HeadPose, head_yaw
 from .apps.base import App, clock_image, make_tile, pil_to_texture
-from .apps.photo import PhotoApp
+from .apps.photo import GalleryApp, PhotoApp
 from . import library
 from .apps.movie import MovieApp
 
@@ -162,15 +162,18 @@ class Shell:
 
     # --- tiles -------------------------------------------------------------
     def _build_home_tiles(self) -> list[Tile]:
-        photo = _find_media(self.media_dir, _PHOTO_EXTS)
+        photos = library.scan_photos(self.library_roots)
         movies = library.scan_movies(self.library_roots, limit=self.MOVIE_PAGE_LIMIT)
-        subtitle = (f"{len(movies)} title{'s' if len(movies) != 1 else ''}"
-                    if movies else "no library found")
+        movie_sub = (f"{len(movies)} title{'s' if len(movies) != 1 else ''}"
+                     if movies else "no library found")
+        photo_sub = (f"{len(photos)} photo{'s' if len(photos) != 1 else ''}"
+                     if photos else "no photos")
         return [
-            Tile("photo", "3D Photo", os.path.basename(photo) if photo else "no media",
-                 lambda p=photo: PhotoApp(self.ctx, p) if p else None,
-                 icon="photo", thumb=_photo_thumb(photo) if photo else None),
-            Tile("movies", "3D Movies", subtitle,
+            Tile("gallery", "3D Gallery", photo_sub,
+                 lambda ps=photos: GalleryApp(self.ctx, ps),
+                 icon="photo",
+                 thumb=_photo_thumb(photos[0].path) if photos else None),
+            Tile("movies", "3D Movies", movie_sub,
                  self._open_movies_page, icon="movie",
                  thumb=_poster_thumb(movies[0]) if movies else None),
             Tile("term", "Terminal", os.path.basename(os.environ.get("SHELL", "sh")),
@@ -252,18 +255,23 @@ class Shell:
 
     # --- events ------------------------------------------------------------
     def on_prev(self):
-        """Launcher: previous tile. App: shrink the window (Nebula-style)."""
+        """Launcher: previous tile. App: previous item (gallery-style
+        apps) or shrink the window (Nebula-style)."""
         if self.mode == LAUNCHER:
             self.scene.move_selection(-1)
             self._nav_this_frame = True
+        elif self.current is not None and self.current.handles_nav:
+            self.current.nav(-1)
         else:
             self._app_scale = _clamp(self._app_scale / APP_SCALE_STEP, APP_SCALE_RANGE)
 
     def on_next(self):
-        """Launcher: next tile. App: grow the window."""
+        """Launcher: next tile. App: next item or grow the window."""
         if self.mode == LAUNCHER:
             self.scene.move_selection(+1)
             self._nav_this_frame = True
+        elif self.current is not None and self.current.handles_nav:
+            self.current.nav(+1)
         else:
             self._app_scale = _clamp(self._app_scale * APP_SCALE_STEP, APP_SCALE_RANGE)
 

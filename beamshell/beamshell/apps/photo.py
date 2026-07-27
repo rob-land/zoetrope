@@ -94,3 +94,66 @@ class PhotoApp(App):
                     t.release()
             except Exception:
                 pass
+
+
+def next_index(current: int, delta: int, count: int) -> int:
+    """Wrap-around gallery navigation (pure; unit-tested)."""
+    if count <= 0:
+        return 0
+    return (current + delta) % count
+
+
+class GalleryApp(App):
+    """Browsable 3D photo gallery: every photo the library scan found,
+    flipped through with prev/next (left/right arrows or head-gesture
+    bindings) while focused. Each entry is shown by the same loader as
+    PhotoApp — MPO split, wide-SBS heuristic, explicit L/R pairs, flat
+    fallback — so all still formats behave identically here."""
+    id = "gallery"
+    title = "3D Gallery"
+    handles_nav = True
+
+    def __init__(self, ctx, photos, index: int = 0):
+        """`photos` is a sequence of library.Photo (path, right_path, title)."""
+        self.ctx = ctx
+        self.photos = list(photos)
+        self.index = next_index(index, 0, len(self.photos))
+        self._inner: PhotoApp | None = None
+        self._show()
+
+    def _show(self) -> None:
+        if self._inner is not None:
+            self._inner.close()
+            self._inner = None
+        if not self.photos:
+            self._inner = None
+            return
+        ph = self.photos[self.index]
+        self._inner = PhotoApp(self.ctx, ph.path, ph.right_path)
+
+    def nav(self, delta: int) -> None:
+        if len(self.photos) < 2:
+            return
+        self.index = next_index(self.index, delta, len(self.photos))
+        self._show()
+
+    def panel(self) -> Panel:
+        if self._inner is not None:
+            p = self._inner.panel()
+            n = len(self.photos)
+            title = self.photos[self.index].title if n else "3D Gallery"
+            p.title = f"{title}  ({self.index + 1}/{n})" if n else title
+            return p
+        return Panel(id="gallery", title="3D Gallery", yaw_deg=0.0,
+                     width_m=1.3, height_m=0.73,
+                     texture=message_texture(self.ctx, [
+                         "No photos found.",
+                         "Drop .mpo / .jps / SBS images (or L/R pairs)",
+                         "into the media folder or your library.",
+                         "", "Backspace = back to menu"]),
+                     stereo_mode="mono")
+
+    def close(self) -> None:
+        if self._inner is not None:
+            self._inner.close()
+            self._inner = None
