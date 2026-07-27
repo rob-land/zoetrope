@@ -90,7 +90,8 @@ def cmd_run(args) -> int:
     renderer = StereoRenderer(ctx)
     tracker = tracking.open_tracker(
         args.tracker, vid=usb.vid if usb else None, sway=args.sway)
-    shell = Shell(ctx, args.media, win.get_proc_address)
+    shell = Shell(ctx, args.media, win.get_proc_address,
+                  library_dir=args.library)
     from .controller import open_controller
     controller = open_controller(args.controller)
     remote = None
@@ -209,7 +210,8 @@ def cmd_watch(args) -> int:
             print(f"[watch] {glasses.profile.name} connected -> starting shell")
             child["proc"] = subprocess.Popen(
                 [sys.executable, "-m", "beamshell", "run",
-                 "--mode", "glasses", "--media", args.media, "--tracker", args.tracker])
+                 "--mode", "glasses", "--media", args.media, "--tracker", args.tracker]
+                + (["--library", args.library] if args.library else []))
 
     def stop(_):
         if child["proc"] is not None and child["proc"].poll() is None:
@@ -240,12 +242,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="serve the phone web-touchpad on PORT (default 8577); "
                         "LAN-open and unauthenticated — opt-in")
     r.add_argument("--media", default=default_media)
+    r.add_argument("--library", default=None,
+                   help="movie library root (default: Ripsaw's library_root)")
     r.add_argument("--monitor", default=None, help="glasses monitor name (glasses mode)")
     r.add_argument("--sway", action="store_true", help="stub tracker head-sway (preview)")
     r.set_defaults(func=cmd_run)
 
     w = sub.add_parser("watch", help="auto-launch on plug (daemon)")
     w.add_argument("--media", default=default_media)
+    w.add_argument("--library", default=None,
+                   help="movie library root (default: Ripsaw's library_root)")
     w.add_argument("--tracker", choices=["auto", "xrdriver", "hidraw", "stub"], default="auto")
     w.set_defaults(func=cmd_watch)
 

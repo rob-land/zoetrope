@@ -18,6 +18,7 @@ from .scene import CylinderLayout, LauncherScene, Panel, _wrap180
 from .stereo import HeadPose, head_yaw
 from .apps.base import App, clock_image, make_tile, pil_to_texture
 from .apps.photo import PhotoApp
+from . import library
 from .apps.movie import MovieApp
 
 LAUNCHER, APP = "launcher", "app"
@@ -86,9 +87,15 @@ def _photo_thumb(path: str):
         return None
 
 
-def _movie_thumb(path: str, media_dir: str):
-    """Grab a frame with ffmpeg (cached under media/.thumbs); None when unavailable."""
-    out = os.path.join(media_dir, ".thumbs", os.path.basename(path) + ".jpg")
+def _thumbs_cache_dir() -> str:
+    cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    return os.path.join(cache, "beamshell", "thumbs")
+
+
+def _movie_thumb(path: str):
+    """Grab a frame with ffmpeg (cached under the XDG cache);
+    None when unavailable."""
+    out = os.path.join(_thumbs_cache_dir(), os.path.basename(path) + ".jpg")
     try:
         if not os.path.exists(out):
             os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -102,6 +109,16 @@ def _movie_thumb(path: str, media_dir: str):
         return _photo_thumb(out)          # reuses the SBS left-eye crop
     except Exception:
         return None
+
+
+def _poster_thumb(mv):
+    """Tile art for a library movie: Jellyfin poster art when present,
+    else a grabbed frame."""
+    if mv.poster:
+        thumb = _photo_thumb(mv.poster)
+        if thumb is not None:
+            return thumb
+    return _movie_thumb(mv.path)
 
 
 def _uniform_scale(s: float):
@@ -121,10 +138,16 @@ class Tile:
 
 
 class Shell:
-    def __init__(self, ctx, media_dir: str, get_proc_address):
+    # How many movie tiles the arc holds comfortably; the library scan
+    # itself is unbounded, this only caps the page.
+    MOVIE_PAGE_LIMIT = 24
+
+    def __init__(self, ctx, media_dir: str, get_proc_address,
+                 library_dir: str | None = None):
         self.ctx = ctx
         self.media_dir = media_dir
         self.get_proc_address = get_proc_address
+        self.library_roots = library.library_roots(media_dir, library_dir)
         self.mode = LAUNCHER
         self.current: App | None = None
         self.scene = LauncherScene(CylinderLayout(radius_m=1.9, arc_span_deg=80.0))
@@ -132,25 +155,59 @@ class Shell:
         self._gaze_lock_yaw: float | None = None
         self._app_scale = 1.0                    # focused-window user zoom
         self._app_dist = APP_DIST_DEFAULT        # focused-window distance (m)
-        self._tiles = self._build_tiles()
+        self._page = "home"
+        self._tiles = self._build_home_tiles()
         self._install_tiles()
         self._clock = self._install_clock()
 
     # --- tiles -------------------------------------------------------------
-    def _build_tiles(self) -> list[Tile]:
+    def _build_home_tiles(self) -> list[Tile]:
         photo = _find_media(self.media_dir, _PHOTO_EXTS)
-        movie = _find_media(self.media_dir, _MOVIE_EXTS)
+        movies = library.scan_movies(self.library_roots, limit=self.MOVIE_PAGE_LIMIT)
+        subtitle = (f"{len(movies)} title{'s' if len(movies) != 1 else ''}"
+                    if movies else "no library found")
         return [
             Tile("photo", "3D Photo", os.path.basename(photo) if photo else "no media",
                  lambda p=photo: PhotoApp(self.ctx, p) if p else None,
                  icon="photo", thumb=_photo_thumb(photo) if photo else None),
-            Tile("movie", "3D Movie", os.path.basename(movie) if movie else "no media",
-                 lambda mv=movie: MovieApp(self.ctx, mv, self.get_proc_address)
-                 if mv else None,
-                 icon="movie", thumb=_movie_thumb(movie, self.media_dir) if movie else None),
+            Tile("movies", "3D Movies", subtitle,
+                 self._open_movies_page, icon="movie",
+                 thumb=_poster_thumb(movies[0]) if movies else None),
             Tile("term", "Terminal", os.path.basename(os.environ.get("SHELL", "sh")),
                  self._open_term, icon="term"),
         ]
+
+    def _build_movie_tiles(self) -> list[Tile]:
+        movies = library.scan_movies(self.library_roots, limit=self.MOVIE_PAGE_LIMIT)
+        tiles = [Tile("_back", "‹ Back", "launcher",
+                      self._open_home_page, icon=None)]
+        for i, mv in enumerate(movies):
+            tiles.append(Tile(
+                f"movie:{i}", mv.title, os.path.basename(mv.path),
+                lambda m=mv: self._open_movie(m),
+                icon="movie", thumb=_poster_thumb(mv)))
+        return tiles
+
+    def _open_movie(self, mv: library.Movie) -> App | None:
+        """Probe through ripplay (3D format + how to play), then hand the
+        result to MovieApp so streamed formats (MVC, MV-HEVC, TAB) go
+        through `ripplay stream` and packed files play directly."""
+        report = library.probe(mv.path)
+        return MovieApp(self.ctx, mv.path, self.get_proc_address, probe=report)
+
+    def _open_movies_page(self) -> None:
+        self._set_page("movies")
+        return None
+
+    def _open_home_page(self) -> None:
+        self._set_page("home")
+        return None
+
+    def _set_page(self, page: str) -> None:
+        self._page = page
+        self._tiles = (self._build_home_tiles() if page == "home"
+                       else self._build_movie_tiles())
+        self._install_tiles()
 
     def _open_term(self):
         try:
@@ -239,6 +296,8 @@ class Shell:
             self.current.close()
             self.current = None
             self.mode = LAUNCHER
+        elif self.mode == LAUNCHER and self._page != "home":
+            self._set_page("home")
 
     def on_pointer(self, yaw_deg: float):
         """Controller ray: select like gaze, but hold the pick against head gaze

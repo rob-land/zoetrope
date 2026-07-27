@@ -12,7 +12,9 @@ so it can't be exercised headless. The FBO/mpv-render wiring follows the standar
 from __future__ import annotations
 
 import os
+import subprocess
 
+from .. import library
 from ..scene import Panel
 from .base import App, message_texture
 
@@ -22,7 +24,7 @@ class MovieApp(App):
     title = "3D Movie"
 
     def __init__(self, ctx, path: str, get_proc_address, stereo_mode: str = "sbs",
-                 fbo_size=(1920, 1080)):
+                 fbo_size=(1920, 1080), probe: dict | None = None):
         self.ctx = ctx
         self.path = path
         self.stereo_mode = stereo_mode
@@ -30,10 +32,38 @@ class MovieApp(App):
         self._render = None
         self._fbo = None
         self._tex = None
-        self._panel = self._init_mpv(path, get_proc_address, fbo_size)
+        self._stream_proc: subprocess.Popen | None = None
+        self._aspect: float | None = None
+        self._panel = self._open(path, get_proc_address, fbo_size, probe)
+
+    def _open(self, path, get_proc_address, fbo_size, report) -> Panel:
+        """Decide how to play: ripplay-probed files stream composed
+        Full-SBS through `ripplay stream` when needed and play packed
+        files directly; unprobed files keep the caller's stereo/fbo."""
+        media = path
+        if report is None:
+            report = library.probe(path)
+        if report is not None:
+            pb = report.get("playback") or {}
+            if pb.get("type") == "unsupported":
+                lines = ["This file can't play in 3D:", pb.get("reason", "")]
+                return self._error([ln for chunk in lines for ln in _wrap(chunk)])
+            fbo_size, self.stereo_mode, self._aspect = library.playback_geometry(report)
+            if pb.get("type") == "stream":
+                cmd = library.stream_command(path)
+                if cmd is None:
+                    return self._error([
+                        "This format needs the ripplay engine,",
+                        "which isn't installed:",
+                        "cargo install --path ~/projects/ripplay",
+                        "(or set RIPPLAY_BIN)"])
+                self._stream_proc = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                media = f"fd://{self._stream_proc.stdout.fileno()}"
+        return self._init_mpv(media, get_proc_address, fbo_size)
 
     def _init_mpv(self, path, get_proc_address, fbo_size) -> Panel:
-        if not os.path.exists(path):
+        if "://" not in path and not os.path.exists(path):
             return self._error([f"File not found:", os.path.basename(path)])
         try:
             import mpv  # python-mpv (needs libmpv.so)
@@ -57,7 +87,7 @@ class MovieApp(App):
                 opengl_init_params={"get_proc_address": self._gpa},
             )
             self._mpv.play(path)
-            aspect = (w / 2) / h if self.stereo_mode == "sbs" else w / h
+            aspect = self._aspect or ((w / 2) / h if self.stereo_mode == "sbs" else w / h)
             # Keep the panel inside the glasses' ~46 deg horizontal FOV
             # (1.3 m at the 1.7 m focus distance is ~42 deg).
             pw = 1.3
@@ -96,3 +126,27 @@ class MovieApp(App):
                 self._mpv.terminate()
         except Exception:
             pass
+        if self._stream_proc is not None:
+            try:
+                self._stream_proc.terminate()
+                self._stream_proc.wait(timeout=5)
+            except Exception:
+                try:
+                    self._stream_proc.kill()
+                except Exception:
+                    pass
+            self._stream_proc = None
+
+
+def _wrap(text: str, width: int = 40) -> list[str]:
+    """Naive word wrap for error-panel lines."""
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return lines or [""]
