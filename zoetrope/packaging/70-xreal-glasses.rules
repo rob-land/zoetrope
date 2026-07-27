@@ -6,6 +6,6 @@ SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3318", TAG+="uaccess", GROUP="input", MOD
 SUBSYSTEM=="usb", ATTR{idVendor}=="3318", TAG+="uaccess", MODE="0660"
 
 # 2) Optionally start the per-user shell service when glasses are attached.
-#    (Requires the systemd --user service installed; see packaging/beamshell.service.)
+#    (Requires the systemd --user service installed; see packaging/zoetrope.service.)
 ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="3318", TAG+="systemd", \
-    ENV{SYSTEMD_USER_WANTS}+="beamshell.service"
+    ENV{SYSTEMD_USER_WANTS}+="zoetrope.service"

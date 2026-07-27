@@ -2,16 +2,16 @@
 # Runs INSIDE the kiosk sway session (exec'd from sway-kiosk.conf).
 # Lifecycle:
 #   - wait for the XREAL DP output (link training + EDID can take seconds on hotplug)
-#   - configure outputs (SBS mode if advertised), run beamshell
+#   - configure outputs (SBS mode if advertised), run zoetrope
 #   - poll outputs every 2s:
 #       glasses output gone >8s          -> end session (udev remove is the fast path)
-#       output/mode changed (2D<->3D)    -> relaunch beamshell to match (covers the
+#       output/mode changed (2D<->3D)    -> relaunch zoetrope to match (covers the
 #                                           glasses' on-board 3D toggle re-EDID)
 #       glasses appeared during preview  -> relaunch in glasses mode
-#   - beamshell exits by itself (Esc)    -> end session
+#   - zoetrope exits by itself (Esc)    -> end session
 
-BEAMSHELL_DIR=/home/rob/projects/beampro/beamshell
-[ -r /etc/beamshell/console.conf ] && . /etc/beamshell/console.conf
+ZOETROPE_DIR=/home/rob/projects/beampro/zoetrope
+[ -r /etc/zoetrope/console.conf ] && . /etc/zoetrope/console.conf
 
 outputs_json() { swaymsg -t get_outputs -r 2>/dev/null; }
 
@@ -56,7 +56,7 @@ for _ in $(seq 1 50); do outputs_json >/dev/null && break; sleep 0.2; done
 
 # Wait for the glasses DP output. While the glasses are physically on USB, do NOT
 # fall back to preview — the DP link/EDID can lag the USB attach by several seconds
-# (this was the "beamshell on the laptop panel" bug). Preview is only for a start
+# (this was the "zoetrope on the laptop panel" bug). Preview is only for a start
 # with no glasses plugged at all.
 WAITED=0
 while :; do
@@ -64,7 +64,7 @@ while :; do
     [ "$DET_OUT" != "-" ] && break
     if glasses_usb_present; then LIMIT=120; else LIMIT=10; fi   # half-second ticks
     if [ "$WAITED" -ge "$LIMIT" ]; then
-        [ "$LIMIT" = 120 ] && echo "beamshell-kiosk: glasses on USB but no DP output after 60s!"
+        [ "$LIMIT" = 120 ] && echo "zoetrope-kiosk: glasses on USB but no DP output after 60s!"
         break
     fi
     sleep 0.5; WAITED=$((WAITED + 1))
@@ -74,20 +74,20 @@ while :; do
     detect
     CUR_OUT=$DET_OUT CUR_SBS=$DET_SBS
     if [ "$CUR_OUT" != "-" ]; then
-        echo "beamshell-kiosk: glasses output $CUR_OUT (sbs_mode_present=$CUR_SBS)"
+        echo "zoetrope-kiosk: glasses output $CUR_OUT (sbs_mode_present=$CUR_SBS)"
         [ "$CUR_SBS" = 1 ] && swaymsg output "$CUR_OUT" mode 3840x1080@60Hz
         swaymsg output "$CUR_OUT" enable
         # Glasses-only: darken the laptop panel while in console mode.
         swaymsg output eDP-1 disable
         ARGS="run --mode glasses"
     else
-        echo "beamshell-kiosk: no XREAL output — preview mode on laptop panel"
+        echo "zoetrope-kiosk: no XREAL output — preview mode on laptop panel"
         swaymsg output eDP-1 enable
         ARGS="run --mode preview --sway"
     fi
 
-    cd "$BEAMSHELL_DIR" || exit 1
-    PYTHONUNBUFFERED=1 python3 -m beamshell $ARGS ${BEAMSHELL_EXTRA_ARGS:-} &
+    cd "$ZOETROPE_DIR" || exit 1
+    PYTHONUNBUFFERED=1 python3 -m zoetrope $ARGS ${ZOETROPE_EXTRA_ARGS:-} &
     BS=$!
 
     RELAUNCH=0 MISS=0 IPCMISS=0
@@ -98,7 +98,7 @@ while :; do
             # sway itself is gone — nothing to supervise for; tear down.
             IPCMISS=$((IPCMISS + 1))
             if [ "$IPCMISS" -ge 2 ]; then
-                echo "beamshell-kiosk: sway IPC gone — exiting"
+                echo "zoetrope-kiosk: sway IPC gone — exiting"
                 kill "$BS" 2>/dev/null; wait "$BS" 2>/dev/null
                 exit 1
             fi
@@ -109,7 +109,7 @@ while :; do
             # Gone: unplug — or a brief dropout while the glasses swap EDIDs (2D<->3D).
             MISS=$((MISS + 1))
             if [ "$MISS" -ge 4 ]; then
-                echo "beamshell-kiosk: glasses output gone — ending session"
+                echo "zoetrope-kiosk: glasses output gone — ending session"
                 kill "$BS" 2>/dev/null; wait "$BS" 2>/dev/null
                 swaymsg exit
                 exit 0
@@ -117,7 +117,7 @@ while :; do
         else
             MISS=0
             if [ "$DET_OUT" != "$CUR_OUT" ] || [ "$DET_SBS" != "$CUR_SBS" ]; then
-                echo "beamshell-kiosk: display changed ($CUR_OUT sbs=$CUR_SBS -> $DET_OUT sbs=$DET_SBS) — relaunching"
+                echo "zoetrope-kiosk: display changed ($CUR_OUT sbs=$CUR_SBS -> $DET_OUT sbs=$DET_SBS) — relaunching"
                 RELAUNCH=1
                 kill "$BS" 2>/dev/null; wait "$BS" 2>/dev/null
                 break
@@ -127,7 +127,7 @@ while :; do
 
     if [ "$RELAUNCH" != 1 ]; then
         wait "$BS" 2>/dev/null
-        echo "beamshell-kiosk: beamshell exited rc=$? — ending session"
+        echo "zoetrope-kiosk: zoetrope exited rc=$? — ending session"
         swaymsg exit
         exit 0
     fi

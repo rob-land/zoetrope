@@ -19,8 +19,8 @@ The controller must be paired/woken first: hold Home until the LED blinks,
 `bluetoothctl scan on` + `connect <MAC>` once; afterwards it reconnects on wake.
 
 Axis frame: the axis-angle vector is right-handed, Y up, -Z forward — the same
-convention as beamshell — so the default mapping is identity. Signs are a
-best guess until tried on hardware; tune live via BEAMSHELL_DD_SIGNS="1,1,1".
+convention as zoetrope — so the default mapping is identity. Signs are a
+best guess until tried on hardware; tune live via ZOETROPE_DD_SIGNS="1,1,1".
 """
 from __future__ import annotations
 
@@ -107,9 +107,9 @@ def _signs_from_env(var: str) -> Vec3:
 
 
 def orientation_quat(ori: Vec3, signs: Vec3 | None = None) -> Quat:
-    """Axis-angle vector -> beamshell quat (Y up, -Z forward)."""
+    """Axis-angle vector -> zoetrope quat (Y up, -Z forward)."""
     if signs is None:
-        signs = _signs_from_env("BEAMSHELL_DD_SIGNS")
+        signs = _signs_from_env("ZOETROPE_DD_SIGNS")
     v = (ori[0] * signs[0], ori[1] * signs[1], ori[2] * signs[2])
     angle = m.v_len(v)
     if angle < 1e-9:
@@ -227,7 +227,7 @@ class DaydreamController:
 
     def __init__(self, address: str | None = None, name: str = DAYDREAM_NAME):
         import bleak  # noqa: F401  (fail fast when the extra isn't installed)
-        self._address = address or os.environ.get("BEAMSHELL_DD_ADDRESS") or None
+        self._address = address or os.environ.get("ZOETROPE_DD_ADDRESS") or None
         self._name = name
         self._lock = threading.Lock()
         self._state: DaydreamState | None = None

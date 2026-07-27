@@ -8,7 +8,7 @@
 1. **Head gaze is the cursor you always have.** It's fast but coarse
    ([study](https://arxiv.org/pdf/1905.05810)), so every gaze-selectable target stays
    big (our tiles are ~20° apart). Gaze *highlights*; something else *commits*.
-2. **Every input is an event source emitting one small vocabulary.** beamshell already
+2. **Every input is an event source emitting one small vocabulary.** zoetrope already
    runs on `prev/next/up/down/activate/back/recenter` + pointer yaw/pitch + text.
    Keyboard, Daydream, head gaze, and the phone web-remote all speak it; adding a ring,
    a watch, or voice later is a new emitter, not a redesign.
@@ -55,9 +55,9 @@ Layer 0  ANCHOR    the stage: floor grid, recenter reference, (later) passthroug
 - **Supplementary mode** = Layer 1 holds 1-3 *virtual monitors* mirroring/extending the
   host session, parked at arc positions your physical monitor doesn't occupy (e.g.
   main screen dead ahead through the glasses' transparent center, panels at ±25°).
-  Ambient layer on. beamshell adds no chrome over the desktop's own.
+  Ambient layer on. zoetrope adds no chrome over the desktop's own.
 - **Primary mode** = Layer 1 holds the launcher arc and native/hosted apps; ambient on;
-  beamshell owns all chrome.
+  zoetrope owns all chrome.
 - The **same panel** can migrate: a movie started as a floating panel next to your
   monitor (supplementary) survives unplugging the monitor and becomes the primary
   session's fullscreen panel. Panels are the unit; posture is just layout policy.

@@ -1,4 +1,4 @@
-"""beamshell — a Nebula-like spatial shell for XREAL glasses on Linux.
+"""zoetrope — a Nebula-like spatial shell for XREAL glasses on Linux.
 
 Pure-logic modules (config, mathutil, detect, stereo, scene) have no third-party
 dependencies. The GL/IO/app modules (renderer, window, tracking, display, apps.*)

@@ -1,4 +1,4 @@
-# 11 — The XR landscape and where beamshell is going
+# 11 — The XR landscape and where zoetrope is going
 
 *Written 2026-07-19 from a research pass over the Linux XR ecosystem, vendor software,
 and academic AR/HCI literature. Companion docs: [12](12-interaction-design.md) (how you
@@ -11,11 +11,11 @@ drive it) and [13](13-app-catalog-and-roadmap.md) (what runs on it).*
 through [FOSDEM 2026](https://fosdem.org/2026/events/attachments/T38AKM-monado-and-beyond/slides/267345/monado_an_tfzl8ak.pdf)).
 On top of it sit three desktop-in-XR projects, each with a lesson for us:
 
-| Project | What it is | Lesson for beamshell |
+| Project | What it is | Lesson for zoetrope |
 |---|---|---|
 | [xrdesktop](https://www.collabora.com/news-and-blog/news-and-events/xrdesktop-014-with-openxr-support-released.html) | Existing desktop windows lifted into XR (GNOME/KDE integration) | Mirroring a 2D desktop is the *bridge* use case, not the destination |
 | [Stardust XR](https://vronlinux.org/) | A true XR display server with spatial widgets; runs as overlay too | The long-term "native spatial shell" model; modular, Wayland-friendly |
-| [wlx-overlay-s](https://wiki.archlinux.org/title/Virtual_reality) | Wayland/X11 desktop access from inside VR overlays | Small, pragmatic, ships today — beamshell's spiritual sibling |
+| [wlx-overlay-s](https://wiki.archlinux.org/title/Virtual_reality) | Wayland/X11 desktop access from inside VR overlays | Small, pragmatic, ships today — zoetrope's spiritual sibling |
 | [SimulaVR](https://simulavr.com/) | A whole Linux-VR laptop-replacement OS (Godot + NixOS) | **Text legibility is the whole game** for productivity; their low-pass filter work is why people can code in it |
 | [Breezy Desktop](https://github.com/wheaney/breezy-desktop) | wheaney's GNOME/KDE virtual-monitor tool over XRLinuxDriver | Already solves "extra monitors on GNOME"; we interop with its driver — don't rebuild it, complement it |
 
@@ -30,7 +30,7 @@ On top of it sit three desktop-in-XR projects, each with a lesson for us:
   virtual monitors** on macOS/Windows with grid layouts and a "code mode";
   [Rokid AR Spatial](https://global.rokid.com/products/rokid-ar-spatial) sells a dedicated
   Android puck. Reviews consistently ding free-form window placement as *less* usable than
-  simple grid/arc layouts — validation for beamshell's cylinder-arc approach.
+  simple grid/arc layouts — validation for zoetrope's cylinder-arc approach.
 - The 2025–26 "AI glasses" wave (Meta Ray-Ban Display, Even Realities, Rokid Glasses)
   found its killer apps in **live captions/translation, teleprompter, navigation
   glances, and hands-free capture** — tiny, glanceable, mostly-text overlays; not
@@ -43,7 +43,7 @@ On top of it sit three desktop-in-XR projects, each with a lesson for us:
   Head-pointing + a *big-target UI* (our tile arc) is the sweet spot when no controller is present.
 - Input taxonomy: handheld (phone, controller) / on-body touch (rings, frames) /
   touchless (voice, gaze, gesture) ([survey](https://ar5iv.labs.arxiv.org/html/1707.09728)).
-  A shell should treat these as interchangeable *event sources* — which beamshell
+  A shell should treat these as interchangeable *event sources* — which zoetrope
   already does (keyboard, Daydream, head gaze all emit the same event set).
 - Driving: AR content placement is safety-critical; imagery far from the forward view
   degrades lane-keeping, and "conformal" world-locked AR arrows are **not**
@@ -56,7 +56,7 @@ On top of it sit three desktop-in-XR projects, each with a lesson for us:
 
 ## Vision: what "1.0" is
 
-**beamshell 1.0 is a spatial session for Linux — one codebase, two postures:**
+**zoetrope 1.0 is a spatial session for Linux — one codebase, two postures:**
 
 1. **Companion posture (supplementary).** Your laptop/phone works normally; plugging in
    the glasses adds a *spatial surround* — 1-3 virtual monitors, floating media panels, a
@@ -65,7 +65,7 @@ On top of it sit three desktop-in-XR projects, each with a lesson for us:
    real estate. (Interop: this posture can also simply *host Breezy Desktop* — our kiosk
    already runs the same driver.)
 2. **Primary posture.** The glasses are the only display (phone in pocket / laptop lid
-   closed / kiosk mode). beamshell is the whole interface: launcher arc, spatial apps,
+   closed / kiosk mode). zoetrope is the whole interface: launcher arc, spatial apps,
    real Wayland apps hosted as floating panels via a nested compositor, driven by
    whatever input is at hand (head gaze, phone-as-touchpad, Daydream, BT keyboard).
 
@@ -89,8 +89,8 @@ one output               →    + virtual outputs             →  1-3 spatial m
 ```
 
 The **nested-compositor step is the keystone** (roadmap #4 in [10](10-linux-shell-design.md)):
-once arbitrary Wayland clients render into our panels, "app development" for beamshell
-mostly stops being beamshell's problem — any Linux app is a spatial app. Stardust XR
+once arbitrary Wayland clients render into our panels, "app development" for zoetrope
+mostly stops being zoetrope's problem — any Linux app is a spatial app. Stardust XR
 and wlx-overlay-s prove both the concept and the plumbing (wlr layer-shell/screencopy,
 virtual outputs).
 
@@ -98,7 +98,7 @@ virtual outputs).
 
 postmarketOS/Mobian convergence is real but rough ([pmOS 26.06](https://linuxiac.com/postmarketos-26-06-brings-fresh-linux-phone-updates/)
 ships GNOME 50 across 250+ devices; Phosh external-display support works but window
-management is primitive). That's an *opportunity*: on a Linux phone, beamshell IS the
+management is primitive). That's an *opportunity*: on a Linux phone, zoetrope IS the
 convergence story — the phone in your pocket is the compute, the glasses are the
 display, the phone screen is the touchpad. No Phosh-on-a-monitor awkwardness; the
 spatial shell is the desktop mode. Same binary as the laptop kiosk, different input

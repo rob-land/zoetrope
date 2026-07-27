@@ -3,23 +3,23 @@
 #
 # Install:
 #   mkdir -p ~/.config/systemd/user
-#   cp beamshell.service ~/.config/systemd/user/
+#   cp zoetrope.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload
-#   systemctl --user enable --now beamshell.service
+#   systemctl --user enable --now zoetrope.service
 #
 # The watcher approach ("watch") needs pyudev. Alternatively, the udev rule can
-# start this unit on plug and it can run `beamshell run --mode glasses` directly.
+# start this unit on plug and it can run `zoetrope run --mode glasses` directly.
 
 [Unit]
-Description=beamshell — XREAL spatial shell (hotplug launcher)
+Description=zoetrope — XREAL spatial shell (hotplug launcher)
 After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
 Type=simple
 # Use `watch` to self-manage plug/unplug, or `run --mode glasses` if started by udev.
-ExecStart=%h/.local/bin/beamshell watch
-Environment=BEAMSHELL_MEDIA=%h/Videos/3d
+ExecStart=%h/.local/bin/zoetrope watch
+Environment=ZOETROPE_MEDIA=%h/Videos/3d
 Restart=on-failure
 RestartSec=2
 

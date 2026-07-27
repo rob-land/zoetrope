@@ -1,8 +1,8 @@
 #!/bin/bash
-# Root helper for beamshell-console.service: VT save/switch/restore.
+# Root helper for zoetrope-console.service: VT save/switch/restore.
 set -u
-STATE=/run/beamshell-console.prevvt
-VT=${BEAMSHELL_CONSOLE_VT:-8}
+STATE=/run/zoetrope-console.prevvt
+VT=${ZOETROPE_CONSOLE_VT:-8}
 
 case "${1:-}" in
 save-and-switch)
@@ -30,7 +30,7 @@ restore)
     exec chvt "${prev:-2}"
     ;;
 *)
-    echo "usage: beamshell-vt save-and-switch|restore" >&2
+    echo "usage: zoetrope-vt save-and-switch|restore" >&2
     exit 2
     ;;
 esac

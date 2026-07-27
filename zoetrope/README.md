@@ -1,4 +1,7 @@
-# beamshell
+# zoetrope
+
+*(formerly "beamshell" — renamed after the spinning-cylinder toy that predates
+cinema, which is exactly what the launcher's arc of tiles is.)*
 
 A **Nebula-like spatial shell for XREAL glasses on Linux** — laptops and Wayland Linux phones
 that support USB-C DisplayPort Alt Mode. When the glasses are plugged in it puts them into
@@ -16,19 +19,19 @@ glasses + GPU to exercise. See "Status" below for exactly what's verified.
 ## Quick start
 
 ```bash
-cd beamshell
+cd zoetrope
 python -m pip install -e .            # core deps: moderngl, glfw, Pillow
 # optional:  pip install -e '.[video,hotplug,heic,controller,term]'
 #            movie player · hotplug · HEIC · Daydream BLE · terminal app
 
 # Develop without glasses (windowed SBS preview, head auto-sways):
-python -m beamshell run --mode preview --sway
+python -m zoetrope run --mode preview --sway
 
 # See what's detected:
-python -m beamshell info
+python -m zoetrope info
 
 # With glasses plugged in (auto-detects the XREAL DP output + USB):
-python -m beamshell run            # --mode auto picks 'glasses' when the DP output is found
+python -m zoetrope run            # --mode auto picks 'glasses' when the DP output is found
 ```
 
 Keys: **arrows** select · **Enter** open · **Backspace** back · **R** recenter · **Esc** quit.
@@ -48,7 +51,7 @@ the window.
 
 ## Phone as touchpad (web remote)
 
-`beamshell run --remote` serves a one-page touchpad on port 8577 — open the printed URL
+`zoetrope run --remote` serves a one-page touchpad on port 8577 — open the printed URL
 in your phone's browser: tap = open, swipes = navigate/size/distance, buttons for
 back/recenter, and a text field that types into the terminal. This is the prototype of
 the Linux-phone posture where the phone screen is the primary input (`../docs/12`).
@@ -57,7 +60,7 @@ the Linux-phone posture where the phone screen is the primary input (`../docs/12
 ## Put 3D media in place
 
 **Movies.** The "3D Movies" tile browses your library: `--library DIR`,
-`$BEAMSHELL_LIBRARY`, or — with zero setup — Ripsaw's `library_root`
+`$ZOETROPE_LIBRARY`, or — with zero setup — Ripsaw's `library_root`
 (`~/.config/ripsaw/config.json`). Jellyfin-style `Title (Year)` folders give the
 tiles their names and `poster.jpg`/`folder.jpg` art. Opening a title probes it
 through the **ripplay engine** (`ripplay` on PATH or `$RIPPLAY_BIN`): packed SBS
@@ -70,8 +73,8 @@ media dir + library (left/right arrows navigate): `.mpo`, `.jps`, wide SBS
 images, explicit `*_l`/`*_r` (or `*-left`/`*-right`) stereo pairs, and flat
 images; `.heic` spatial photos too with `pillow-heif` installed.
 
-The demo media dir also still works: default `./media` (or `$BEAMSHELL_MEDIA`).
-Thumbnails are cached under `~/.cache/beamshell/thumbs`. A clock floats above
+The demo media dir also still works: default `./media` (or `$ZOETROPE_MEDIA`).
+Thumbnails are cached under `~/.cache/zoetrope/thumbs`. A clock floats above
 the tile arc, and the focused tile zooms slightly. With a Daydream controller
 connected, a glowing cursor dot shows where you're pointing.
 
@@ -80,8 +83,8 @@ connected, a glowing cursor dot shows where you're pointing.
 Two options (see `packaging/`):
 1. **User service + hotplug watcher** (`pip install -e '.[hotplug]'`):
    ```bash
-   cp packaging/beamshell.service ~/.config/systemd/user/
-   systemctl --user enable --now beamshell.service   # runs `beamshell watch`
+   cp packaging/zoetrope.service ~/.config/systemd/user/
+   systemctl --user enable --now zoetrope.service   # runs `zoetrope watch`
    ```
 2. **udev rule** (also grants hidraw access for direct IMU reads):
    ```bash
@@ -118,8 +121,8 @@ on by default via `--controller auto` when bleak is installed):
 
 Pair it once at the system level: hold **Home** until the LED pulses, then
 `bluetoothctl` → `scan on` → `pair <MAC>` (it advertises as "Daydream controller").
-After that beamshell auto-connects whenever the controller wakes. The orientation
-axis signs are a first-hardware-test guess; tune live with `BEAMSHELL_DD_SIGNS="1,1,1"`.
+After that zoetrope auto-connects whenever the controller wakes. The orientation
+axis signs are a first-hardware-test guess; tune live with `ZOETROPE_DD_SIGNS="1,1,1"`.
 
 ## Status — what's verified vs. needs hardware
 
@@ -149,7 +152,7 @@ phosh/sway. The heavy lifting is identical; only packaging differs.
 ## Layout
 
 ```
-beamshell/
+zoetrope/
   config.py     XREAL VID/PIDs, per-model display+optics profiles
   mathutil.py   vec/quat/mat4 (pure python)
   detect.py     USB (sysfs/udev) + EDID glasses detection

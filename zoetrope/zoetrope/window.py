@@ -28,7 +28,7 @@ class WindowConfig:
     monitor_name: str | None = None
     width: int = 1920
     height: int = 540
-    title: str = "beamshell"
+    title: str = "zoetrope"
 
 
 class Window:

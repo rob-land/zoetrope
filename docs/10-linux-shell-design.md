@@ -1,6 +1,6 @@
-# 10 — Design: `beamshell`, a Nebula-like Linux Shell
+# 10 — Design: `zoetrope`, a Nebula-like Linux Shell
 
-Design notes for the `beamshell` project (`../beamshell/`) — a spatial shell that launches
+Design notes for the `zoetrope` project (`../zoetrope/`) — a spatial shell that launches
 when XREAL glasses are plugged into a Linux laptop or a Wayland Linux phone with DP Alt Mode,
 renders a Nebula-like floating launcher in 3DoF, and opens a 3D movie player and 3D photo
 viewer. Stack (chosen with the user): **Python + moderngl + libmpv**.
@@ -15,7 +15,7 @@ viewer. Stack (chosen with the user): **Python + moderngl + libmpv**.
 - **Codec-complete video** — libmpv plays anything (H.264/HEVC/MV-HEVC), rendered into a GL FBO.
 - Alternatives considered: **Godot 4** (nicer UI, weaker built-in codecs, can't verify headless
   here) and **Monado/OpenXR** (most reusable, heaviest setup, no One Pro driver upstream yet). We
-  can still expose beamshell's tracker/renderer through Monado later (see Roadmap).
+  can still expose zoetrope's tracker/renderer through Monado later (see Roadmap).
 
 ## Architecture
 
@@ -89,14 +89,14 @@ and a headless-GL launcher frame).
 
 ## Roadmap
 
-1. **Bring-up on the laptop** with the One Pro: `beamshell run` (glasses mode), confirm SBS output +
+1. **Bring-up on the laptop** with the One Pro: `zoetrope run` (glasses mode), confirm SBS output +
    XRLinuxDriver tracking; tune IPD/FoV per `config.PROFILES["one_pro"]`.
    *2026-07-19: tracking wiring verified live. The driver's compiled-in default is
    `disabled=true`, so `~/.config/xr_driver/config.ini` needs `disabled=false` (the console
    installer now writes it); with that, opentrack packets flow and `XRDriverTracker` tracks
    with ~0.02° jitter at rest. Worn test: yaw correct, pitch was inverted —
    `DEFAULT_OT_SIGNS = (1, -1, -1)` now flips pitch AND roll (both follow from the NWU→
-   beamshell axis mapping: driver pitch axis = our -X, roll axis = our -Z). Roll flip is
+   zoetrope axis mapping: driver pitch axis = our -X, roll axis = our -Z). Roll flip is
    derived, not yet confirmed by tilting the head.*
 2. **Confirm the HID IMU layout** for a `hidraw` fallback (capture per `08`).
 3. **Nicer launcher** — icons, more tiles, a clock/now-playing panel; curved multi-row layout.
@@ -105,7 +105,7 @@ and a headless-GL launcher frame).
    cursor dot. Multi-row layout still open.*
 3a. **Daydream controller** *(added 2026-07-19)* — `controller.py` BLE laser pointer:
    point/click/swipe/buttons; packet parser + gestures unit-tested; axis signs
-   (`BEAMSHELL_DD_SIGNS`) still need a live pairing to confirm.
+   (`ZOETROPE_DD_SIGNS`) still need a live pairing to confirm.
 3b. **Window manipulation** *(added 2026-07-19)* — Nebula-style resize + push/pull of the
    focused app panel: ←/→ size, ↑/↓ distance (Daydream: h-swipe/volume = size, v-swipe =
    distance), clamped 0.45–2.5× and 0.9–4 m, verified via headless screenshots.
@@ -113,11 +113,11 @@ and a headless-GL launcher frame).
    (like Nebula's floating 2D panels) via a nested compositor (wlroots/Smithay) — the big step
    toward a true desktop-in-glasses.
 5. **Monado path** — expose the tracker as a Monado 3DoF driver so OpenXR apps (and xrdesktop /
-   Stardust XR) work too; keep beamshell as the lightweight native shell.
+   Stardust XR) work too; keep zoetrope as the lightweight native shell.
 6. **Phone packaging** — postmarketOS/Mobian APK-equivalent + the systemd user service.
 7. **(Stretch) 6DoF** — only if the X1 pose is reverse-engineered or via Monado+Basalt SLAM on the
    Eye's UVC feed.
 
 ## Files
 
-See `../beamshell/README.md` for the module-by-module layout and run instructions.
+See `../zoetrope/README.md` for the module-by-module layout and run instructions.

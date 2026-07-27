@@ -22,13 +22,13 @@ it is flagged inline.
 | [07 — Linux 3D shell plan](07-linux-3d-shell-plan.md) | Plan for a Nebula-like spatial shell on a Linux laptop |
 | [08 — Operational notes](08-operational-notes.md) | Wireless adb (required when glasses occupy the USB-C port), tooling, how to reproduce captures |
 | [09 — Live capture: One Pro + Eye](09-live-capture-one-pro-eye.md) | Live wireless-adb session with the glasses attached — EDID, display modes, 3DoF-vs-6DoF state, IMU stream |
-| [10 — Design: beamshell Linux shell](10-linux-shell-design.md) | Architecture of the `../beamshell/` Nebula-like shell (Python + moderngl + mpv) |
-| [11 — XR landscape & vision](11-xr-landscape-and-vision.md) | Research pass over the Linux XR ecosystem + what beamshell 1.0 is (phone + desktop, two postures) |
+| [10 — Design: zoetrope (formerly beamshell) Linux shell](10-linux-shell-design.md) | Architecture of the `../zoetrope/` Nebula-like shell (Python + moderngl + mpv) |
+| [11 — XR landscape & vision](11-xr-landscape-and-vision.md) | Research pass over the Linux XR ecosystem + what zoetrope 1.0 is (phone + desktop, two postures) |
 | [12 — Interaction design](12-interaction-design.md) | How you drive it: input matrix per platform, the layer model, display-behavior modes |
 | [13 — App catalog & roadmap](13-app-catalog-and-roadmap.md) | What's worth building for a face-worn display; walking/driving analysis; backlog + milestones |
 | [Appendix — Raw evidence](appendix-raw-evidence.md) | Verbatim dumps: partitions, props, services, sensors, camera configs |
 
-A runnable v0.1 of the shell lives in [`../beamshell/`](../beamshell/) (18 passing unit tests).
+A runnable v0.1 of the shell lives in [`../zoetrope/`](../zoetrope/) (18 passing unit tests).
 
 ## TL;DR
 

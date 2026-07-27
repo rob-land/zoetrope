@@ -42,7 +42,7 @@ below.
 The industry's actual daily-use killer apps are **live captions/translation,
 navigation glances, and teleprompter-style text** ([captions roundup](https://www.hearingtracker.com/hearing-glasses/hear-with-your-eyes-five-ar-live-captioning-glasses),
 [RayNeo nav guide](https://www.rayneo.com/blogs/news/best-smart-glasses-for-navigation-2026-guide)) —
-all mostly-text, all sideview-posture. For beamshell on a Linux phone:
+all mostly-text, all sideview-posture. For zoetrope on a Linux phone:
 
 | Use case | Design (per [12](12-interaction-design.md) sideview rules) | Feasibility |
 |---|---|---|
@@ -72,7 +72,7 @@ near the forward view, voice-primary, and built on the safety literature — not
 1. **Drift** — observed 2026-07-19. Two-part fix: (a) the driver was
    `calibration_state=NOT_CALIBRATED` — let the glasses sit still for ~15 s after
    plug-in, and expose "recalibrate" (the driver honors a `recalibrate` control flag;
-   `xr_driver_cli` can set it) as a beamshell action next to recenter; (b) long-term,
+   `xr_driver_cli` can set it) as a zoetrope action next to recenter; (b) long-term,
    on-glasses anchor for the main panel (below).
 2. **Anchor / smooth-follow / sideview modes** — host-side per-panel modes are small
    code (damped yaw, head-locked offsets — see [12](12-interaction-design.md));

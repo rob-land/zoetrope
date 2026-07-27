@@ -1,4 +1,4 @@
-"""Unit tests for beamshell's dependency-free core (run: pytest, or python -m unittest)."""
+"""Unit tests for zoetrope's dependency-free core (run: pytest, or python -m unittest)."""
 import math
 import os
 import struct
@@ -8,7 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from beamshell import config, detect, mathutil as m, scene, stereo
+from zoetrope import config, detect, mathutil as m, scene, stereo
 
 
 def approx(a, b, tol=1e-6):
@@ -85,23 +85,23 @@ class TestDisplayModes(unittest.TestCase):
             f.write("\n".join(modes) + "\n")
 
     def test_output_modes_dedup(self):
-        from beamshell import display
+        from zoetrope import display
         with tempfile.TemporaryDirectory() as root:
             self._fake_connector(root, "card1-DP-1",
                                  ["1920x1080", "1920x1080", "1920x1080"])
             self.assertEqual(display.output_modes("card1-DP-1", root), ["1920x1080"])
 
     def test_sbs_available_false_when_only_2d(self):
-        from beamshell import display
-        from beamshell.config import PROFILES
+        from zoetrope import display
+        from zoetrope.config import PROFILES
         with tempfile.TemporaryDirectory() as root:
             self._fake_connector(root, "card1-DP-1", ["1920x1080"])
             tgt = display.DisplayTarget("card1-DP-1", "DP-1", PROFILES["one_pro"])
             self.assertFalse(display.sbs_available(tgt, PROFILES["one_pro"], root))
 
     def test_sbs_available_true_when_3840_present(self):
-        from beamshell import display
-        from beamshell.config import PROFILES
+        from zoetrope import display
+        from zoetrope.config import PROFILES
         with tempfile.TemporaryDirectory() as root:
             self._fake_connector(root, "card1-DP-1", ["3840x1080", "1920x1080"])
             tgt = display.DisplayTarget("card1-DP-1", "DP-1", PROFILES["one_pro"])
@@ -213,20 +213,20 @@ class TestXRDriverParsing(unittest.TestCase):
     """Parsers for wheaney/XRLinuxDriver's two output channels."""
 
     def test_opentrack_packet_roundtrip(self):
-        from beamshell.tracking import parse_opentrack_packet
+        from zoetrope.tracking import parse_opentrack_packet
         pkt = struct.pack("<6dI", 1.0, 2.0, 3.0, 45.0, -10.0, 5.0, 1234)
         self.assertEqual(parse_opentrack_packet(pkt),
                          (1.0, 2.0, 3.0, 45.0, -10.0, 5.0))
         self.assertIsNone(parse_opentrack_packet(b"short"))
 
     def test_opentrack_identity(self):
-        from beamshell.tracking import opentrack_to_quat
+        from zoetrope.tracking import opentrack_to_quat
         q = opentrack_to_quat(0.0, 0.0, 0.0)
         self.assertTrue(approx(abs(q[0]), 1.0, 1e-6))
 
-    def test_opentrack_yaw_maps_to_beamshell_azimuth(self):
-        from beamshell.tracking import opentrack_to_quat
-        # Driver yaw +30 (positive-left in NWU) -> beamshell azimuth -30 (left).
+    def test_opentrack_yaw_maps_to_zoetrope_azimuth(self):
+        from zoetrope.tracking import opentrack_to_quat
+        # Driver yaw +30 (positive-left in NWU) -> zoetrope azimuth -30 (left).
         q = opentrack_to_quat(30.0, 0.0, 0.0)
         pose = stereo.HeadPose(orientation=q)
         self.assertTrue(approx(math.degrees(stereo.head_yaw(pose)), -30.0, 1e-4))
@@ -234,7 +234,7 @@ class TestXRDriverParsing(unittest.TestCase):
     def test_opentrack_pitch_default_sign_flipped(self):
         # Hardware-verified 2026-07-19: up/down was inverted with identity signs,
         # so the default must flip pitch (driver pitch axis is our -X).
-        from beamshell.tracking import DEFAULT_OT_SIGNS, opentrack_to_quat
+        from zoetrope.tracking import DEFAULT_OT_SIGNS, opentrack_to_quat
         self.assertEqual(DEFAULT_OT_SIGNS[1], -1.0)
         up_component_default = m.q_rotate(
             opentrack_to_quat(0.0, 20.0, 0.0), (0, 0, -1))[1]
@@ -255,13 +255,13 @@ class TestXRDriverParsing(unittest.TestCase):
         return bytes(buf)
 
     def test_breezy_valid(self):
-        from beamshell.tracking import parse_breezy_imu
+        from zoetrope.tracking import parse_breezy_imu
         q = parse_breezy_imu(self._breezy_buf(w=1.0, date_ms=5000), now_ms=5100)
         self.assertIsNotNone(q)
         self.assertTrue(approx(q[0], 1.0, 1e-6))  # (w,x,y,z), w first
 
     def test_breezy_rejects_bad_version_parity_stale(self):
-        from beamshell.tracking import parse_breezy_imu
+        from zoetrope.tracking import parse_breezy_imu
         self.assertIsNone(parse_breezy_imu(self._breezy_buf(version=4)))
         good = bytearray(self._breezy_buf())
         good[130] ^= 0xFF   # corrupt orientation without fixing parity
@@ -274,22 +274,22 @@ class TestGazeKeyboardPriority(unittest.TestCase):
     selection reverted after one frame under a static tracker)."""
 
     def test_no_lock_allows_gaze(self):
-        from beamshell.shell import gaze_may_select
+        from zoetrope.shell import gaze_may_select
         self.assertTrue(gaze_may_select(None, 0.0))
 
     def test_locked_blocks_gaze_while_head_still(self):
-        from beamshell.shell import gaze_may_select
+        from zoetrope.shell import gaze_may_select
         self.assertFalse(gaze_may_select(0.0, 0.0))
         self.assertFalse(gaze_may_select(0.0, 5.0))
         self.assertFalse(gaze_may_select(0.0, -5.0))
 
     def test_head_turn_past_threshold_resumes_gaze(self):
-        from beamshell.shell import gaze_may_select
+        from zoetrope.shell import gaze_may_select
         self.assertTrue(gaze_may_select(0.0, 9.0))
         self.assertTrue(gaze_may_select(0.0, -9.0))
 
     def test_wraparound(self):
-        from beamshell.shell import gaze_may_select
+        from zoetrope.shell import gaze_may_select
         self.assertFalse(gaze_may_select(179.0, -178.0))  # 3 deg apart across the seam
         self.assertTrue(gaze_may_select(179.0, -160.0))
 
@@ -320,11 +320,11 @@ def _dd_packet(time=0, seq=0, ori=(0, 0, 0), acc=(0, 0, 0), gyro=(0, 0, 0),
 
 class TestDaydreamParsing(unittest.TestCase):
     def test_rejects_short_packet(self):
-        from beamshell.controller import parse_daydream_packet
+        from zoetrope.controller import parse_daydream_packet
         self.assertIsNone(parse_daydream_packet(b"\x00" * 19))
 
     def test_zero_packet_is_neutral(self):
-        from beamshell.controller import parse_daydream_packet
+        from zoetrope.controller import parse_daydream_packet
         s = parse_daydream_packet(_dd_packet())
         self.assertEqual(s.ori, (0.0, 0.0, 0.0))
         self.assertEqual(s.touch, (0.0, 0.0))
@@ -332,14 +332,14 @@ class TestDaydreamParsing(unittest.TestCase):
         self.assertFalse(s.click or s.app or s.home or s.vol_up or s.vol_down)
 
     def test_ori_roundtrip_incl_negative(self):
-        from beamshell.controller import parse_daydream_packet, _ORI_SCALE
+        from zoetrope.controller import parse_daydream_packet, _ORI_SCALE
         s = parse_daydream_packet(_dd_packet(ori=(100, -200, 8191)))
         self.assertTrue(approx(s.ori[0], 100 * _ORI_SCALE))
         self.assertTrue(approx(s.ori[1], -200 * _ORI_SCALE))
         self.assertTrue(approx(s.ori[2], -1 * _ORI_SCALE))  # 8191 = -1 in 13-bit
 
     def test_acc_gyro_roundtrip(self):
-        from beamshell.controller import parse_daydream_packet, _ACC_SCALE, _GYRO_SCALE
+        from zoetrope.controller import parse_daydream_packet, _ACC_SCALE, _GYRO_SCALE
         s = parse_daydream_packet(_dd_packet(acc=(8191, 512, -3), gyro=(-1000, 1, 0)))
         self.assertTrue(approx(s.accel[0], -1 * _ACC_SCALE))
         self.assertTrue(approx(s.accel[1], 512 * _ACC_SCALE))
@@ -348,21 +348,21 @@ class TestDaydreamParsing(unittest.TestCase):
         self.assertTrue(approx(s.gyro[1], 1 * _GYRO_SCALE))
 
     def test_buttons_and_seq(self):
-        from beamshell.controller import parse_daydream_packet
+        from zoetrope.controller import parse_daydream_packet
         s = parse_daydream_packet(_dd_packet(seq=13, buttons=0x1 | 0x2 | 0x10))
         self.assertEqual(s.seq, 13)
         self.assertTrue(s.click and s.home and s.vol_up)
         self.assertFalse(s.app or s.vol_down)
 
     def test_touch_roundtrip(self):
-        from beamshell.controller import parse_daydream_packet
+        from zoetrope.controller import parse_daydream_packet
         s = parse_daydream_packet(_dd_packet(touch=(128, 255)))
         self.assertTrue(approx(s.touch[0], 128 / 255.0))
         self.assertTrue(approx(s.touch[1], 1.0))
         self.assertTrue(s.touching)
 
     def test_orientation_quat_and_pointer_yaw(self):
-        from beamshell.controller import orientation_quat, pointer_yaw_pitch_deg
+        from zoetrope.controller import orientation_quat, pointer_yaw_pitch_deg
         self.assertEqual(orientation_quat((0, 0, 0), (1, 1, 1)), m.QUAT_IDENTITY)
         # +90 deg about +Y rotates forward to the LEFT -> pointer yaw -90.
         q = orientation_quat((0.0, math.pi / 2.0, 0.0), (1, 1, 1))
@@ -371,7 +371,7 @@ class TestDaydreamParsing(unittest.TestCase):
         self.assertTrue(approx(pitch, 0.0, 1e-4))
 
     def test_pointer_yaw_matches_head_yaw_convention(self):
-        from beamshell.controller import pointer_yaw_pitch_deg
+        from zoetrope.controller import pointer_yaw_pitch_deg
         q = m.q_from_axis_angle((0, 1, 0), math.radians(-30))  # look right
         yaw, _ = pointer_yaw_pitch_deg(q)
         head = math.degrees(stereo.head_yaw(stereo.HeadPose(orientation=q)))
@@ -382,11 +382,11 @@ class TestDaydreamParsing(unittest.TestCase):
 class TestDaydreamGestures(unittest.TestCase):
     @staticmethod
     def _state(**kw):
-        from beamshell.controller import parse_daydream_packet
+        from zoetrope.controller import parse_daydream_packet
         return parse_daydream_packet(_dd_packet(**kw))
 
     def test_click_edge_fires_once(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         self.assertEqual(g.feed(self._state(buttons=0x1)), ["activate"])
         self.assertEqual(g.feed(self._state(buttons=0x1)), [])
@@ -394,7 +394,7 @@ class TestDaydreamGestures(unittest.TestCase):
         self.assertEqual(g.feed(self._state(buttons=0x1)), ["activate"])
 
     def test_app_home_vol_buttons(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         self.assertEqual(g.feed(self._state(buttons=0x4)), ["back"])
         self.assertEqual(g.feed(self._state(buttons=0x4 | 0x2)), ["recenter"])
@@ -403,21 +403,21 @@ class TestDaydreamGestures(unittest.TestCase):
         self.assertEqual(g2.feed(self._state(buttons=0x8)), ["prev"])
 
     def test_swipe_right_is_next(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         for x in (40, 90, 140, 200):
             self.assertEqual(g.feed(self._state(touch=(x, 128))), [])
         self.assertEqual(g.feed(self._state()), ["next"])  # finger lifts
 
     def test_swipe_left_is_prev(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         for x in (200, 120, 40):
             g.feed(self._state(touch=(x, 128)))
         self.assertEqual(g.feed(self._state()), ["prev"])
 
     def test_click_suppresses_swipe(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         g.feed(self._state(touch=(40, 128)))
         self.assertEqual(g.feed(self._state(touch=(120, 128), buttons=0x1)), ["activate"])
@@ -425,7 +425,7 @@ class TestDaydreamGestures(unittest.TestCase):
         self.assertEqual(g.feed(self._state()), [])   # release: no extra 'next'
 
     def test_vertical_swipes_are_up_down(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         for y in (200, 120, 40):                       # drag toward the top edge
             g.feed(self._state(touch=(128, y)))
@@ -436,7 +436,7 @@ class TestDaydreamGestures(unittest.TestCase):
         self.assertEqual(g2.feed(self._state()), ["down"])
 
     def test_short_or_diagonal_touch_no_swipe(self):
-        from beamshell.controller import ControllerGestures
+        from zoetrope.controller import ControllerGestures
         g = ControllerGestures()
         g.feed(self._state(touch=(100, 100)))
         g.feed(self._state(touch=(120, 110)))          # short drag
@@ -448,13 +448,13 @@ class TestDaydreamGestures(unittest.TestCase):
 
 class TestPointerGate(unittest.TestCase):
     def test_static_pointer_is_inactive(self):
-        from beamshell.controller import PointerGate
+        from zoetrope.controller import PointerGate
         gate = PointerGate()
         self.assertFalse(gate.feed(10.0, 0.0, now=0.0))
         self.assertFalse(gate.feed(10.0, 0.0, now=0.1))
 
     def test_movement_activates_then_expires(self):
-        from beamshell.controller import PointerGate
+        from zoetrope.controller import PointerGate
         gate = PointerGate(move_deg=1.0, window_s=0.6)
         gate.feed(10.0, 0.0, now=0.0)
         self.assertTrue(gate.feed(12.0, 0.0, now=0.1))    # moved 2 deg
@@ -471,14 +471,14 @@ class TestWindowManipulation(unittest.TestCase):
         (constructing a real Shell needs a GL context)."""
         from types import SimpleNamespace
 
-        from beamshell import shell as sh
+        from zoetrope import shell as sh
         state = dict(mode=sh.APP, current=None, _app_scale=1.0,
                      _app_dist=sh.APP_DIST_DEFAULT)
         state.update(attrs)
         return SimpleNamespace(**state)
 
     def test_focus_model_places_and_scales(self):
-        from beamshell.shell import focus_model
+        from zoetrope.shell import focus_model
         mat = focus_model(0.8, 0.5, distance=2.0, scale=1.5)
         v = _apply(mat, [1.0, 1.0, 0.0, 1.0])
         self.assertTrue(approx(v[0], 0.8 * 1.5))
@@ -486,7 +486,7 @@ class TestWindowManipulation(unittest.TestCase):
         self.assertTrue(approx(v[2], -2.0))
 
     def test_resize_steps_and_clamps(self):
-        from beamshell import shell as sh
+        from zoetrope import shell as sh
         s = self._app_shell()
         sh.Shell.on_next(s)
         self.assertTrue(approx(s._app_scale, sh.APP_SCALE_STEP))
@@ -500,7 +500,7 @@ class TestWindowManipulation(unittest.TestCase):
         self.assertTrue(approx(s._app_scale, sh.APP_SCALE_RANGE[0]))
 
     def test_push_pull_steps_and_clamps(self):
-        from beamshell import shell as sh
+        from zoetrope import shell as sh
         s = self._app_shell()
         sh.Shell.on_farther(s)
         self.assertTrue(approx(s._app_dist, sh.APP_DIST_DEFAULT + sh.APP_DIST_STEP))
@@ -512,7 +512,7 @@ class TestWindowManipulation(unittest.TestCase):
         self.assertTrue(approx(s._app_dist, sh.APP_DIST_RANGE[0]))
 
     def test_launcher_mode_ignores_push_pull(self):
-        from beamshell import shell as sh
+        from zoetrope import shell as sh
         s = self._app_shell(mode=sh.LAUNCHER)
         sh.Shell.on_farther(s)
         sh.Shell.on_closer(s)

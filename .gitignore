@@ -2,7 +2,7 @@
 vendor/
 
 # Test media (large binaries; not source)
-beamshell/media/
+zoetrope/media/
 
 # Python build/test artifacts
 __pycache__/

@@ -27,7 +27,7 @@ class TestTermSession(unittest.TestCase):
             raise unittest.SkipTest("pyte not installed")
 
     def test_command_output_reaches_screen(self):
-        from beamshell.apps.term import TermSession
+        from zoetrope.apps.term import TermSession
         s = TermSession(cols=40, rows=8, argv=["sh", "-c", "echo B00T-OK; sleep 30"])
         try:
             self.assertTrue(_pump_until(s, "B00T-OK"), s.text_lines())
@@ -35,7 +35,7 @@ class TestTermSession(unittest.TestCase):
             s.close()
 
     def test_write_input_round_trip(self):
-        from beamshell.apps.term import TermSession
+        from zoetrope.apps.term import TermSession
         s = TermSession(cols=40, rows=8, argv=["sh"])
         try:
             # Quotes keep the echoed *command* from matching the marker.
@@ -47,7 +47,7 @@ class TestTermSession(unittest.TestCase):
     def test_render_screen_image(self):
         import pyte
 
-        from beamshell.apps.term import CELL_H, CELL_W, PAD, render_screen
+        from zoetrope.apps.term import CELL_H, CELL_W, PAD, render_screen
         screen = pyte.Screen(20, 5)
         pyte.ByteStream(screen).feed(b"hello")
         img = render_screen(screen)
@@ -56,7 +56,7 @@ class TestTermSession(unittest.TestCase):
         self.assertGreater(len(img.getcolors(maxcolors=4096) or []), 1)
 
     def test_close_is_idempotent_and_kills_child(self):
-        from beamshell.apps.term import TermSession
+        from zoetrope.apps.term import TermSession
         s = TermSession(cols=20, rows=4, argv=["sleep", "60"])
         pid = s.pid
         s.close()
@@ -75,7 +75,7 @@ class TestTermSession(unittest.TestCase):
 
 class TestRemoteServer(unittest.TestCase):
     def setUp(self):
-        from beamshell.remote import RemoteServer
+        from zoetrope.remote import RemoteServer
         self.srv = RemoteServer(port=0, bind="127.0.0.1")
         self.base = f"http://127.0.0.1:{self.srv.port}"
 
@@ -90,7 +90,7 @@ class TestRemoteServer(unittest.TestCase):
 
     def test_serves_touchpad_page(self):
         html = urllib.request.urlopen(self.base + "/", timeout=5).read().decode()
-        self.assertIn("beamshell remote", html)
+        self.assertIn("zoetrope remote", html)
         self.assertIn("touchstart", html)
 
     def test_event_round_trip_and_validation(self):

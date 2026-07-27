@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from beamshell import library
+from zoetrope import library
 
 
 # --- title derivation -------------------------------------------------------
@@ -88,7 +88,7 @@ def test_library_roots_env_override_and_dedupe(tmp_path, monkeypatch):
     env_dir.mkdir()
     media = tmp_path / "media"
     media.mkdir()
-    monkeypatch.setenv("BEAMSHELL_LIBRARY", str(env_dir))
+    monkeypatch.setenv("ZOETROPE_LIBRARY", str(env_dir))
     roots = library.library_roots(str(media), explicit=str(env_dir))
     assert roots == [str(env_dir), str(media)]
 
@@ -165,7 +165,7 @@ def test_scan_photos_pairs_and_titles(tmp_path):
 # --- gallery navigation -----------------------------------------------------
 
 def test_gallery_next_index_wraps():
-    from beamshell.apps.photo import next_index
+    from zoetrope.apps.photo import next_index
     assert next_index(0, +1, 3) == 1
     assert next_index(2, +1, 3) == 0
     assert next_index(0, -1, 3) == 2

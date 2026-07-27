@@ -127,7 +127,7 @@ def find_glasses() -> UsbGlasses | None:
 def monitor(on_plug, on_unplug):
     """Blocking udev monitor. Calls on_plug(UsbGlasses)/on_unplug(dict) on hotplug.
 
-    Requires pyudev (`pip install pyudev`). Used by `beamshell watch`.
+    Requires pyudev (`pip install pyudev`). Used by `zoetrope watch`.
     """
     import pyudev  # lazy: only needed for the live daemon
 

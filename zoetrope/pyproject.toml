@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "beamshell"
+name = "zoetrope-shell"   # distribution name; "zoetrope" is squatted on PyPI. Module + CLI stay `zoetrope`.
 version = "0.1.0"
 description = "A Nebula-like spatial shell for XREAL glasses on Linux (laptop + Wayland phone)"
 readme = "README.md"
@@ -20,17 +20,17 @@ dependencies = [
 
 [project.optional-dependencies]
 video = ["python-mpv>=1.0"]        # needs libmpv.so on the system
-hotplug = ["pyudev>=0.24"]         # for `beamshell watch`
+hotplug = ["pyudev>=0.24"]         # for `zoetrope watch`
 heic = ["pillow-heif>=0.13"]       # to read the Beam Pro's HEIC spatial stills
 controller = ["bleak>=0.21"]       # Google Daydream controller (BLE pointer)
 term = ["pyte>=0.8"]               # floating terminal app
 dev = ["pytest>=7"]
 
 [project.scripts]
-beamshell = "beamshell.main:main"
+zoetrope = "zoetrope.main:main"
 
 [tool.setuptools.packages.find]
-include = ["beamshell*"]
+include = ["zoetrope*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

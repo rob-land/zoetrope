@@ -5,5 +5,5 @@ Pillow>=9.0
 
 # Optional — install as needed:
 #   python-mpv>=1.0     # 3D movie player (also needs system libmpv: `dnf install mpv-libs`)
-#   pyudev>=0.24        # `beamshell watch` hotplug daemon
+#   pyudev>=0.24        # `zoetrope watch` hotplug daemon
 #   pillow-heif>=0.13   # read HEIC spatial photos from the Beam Pro

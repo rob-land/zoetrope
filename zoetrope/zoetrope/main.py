@@ -1,11 +1,11 @@
-"""beamshell entrypoint.
+"""zoetrope entrypoint.
 
-  beamshell run [--mode auto|preview|glasses] [--tracker auto|xrdriver|hidraw|stub]
+  zoetrope run [--mode auto|preview|glasses] [--tracker auto|xrdriver|hidraw|stub]
                 [--media DIR] [--sway] [--monitor NAME]
-  beamshell watch     # daemon: launch/stop the shell as glasses are plugged/unplugged
-  beamshell info      # print detected glasses / display, then exit
+  zoetrope watch     # daemon: launch/stop the shell as glasses are plugged/unplugged
+  zoetrope info      # print detected glasses / display, then exit
 
-Run without glasses:  beamshell run --mode preview --sway
+Run without glasses:  zoetrope run --mode preview --sway
 """
 from __future__ import annotations
 
@@ -77,14 +77,14 @@ def cmd_run(args) -> int:
         else:
             print("[display] rendering MONO (2D). No 3840x1080 SBS mode is exposed.")
             print("          -> To get real 3D, switch the glasses into their 3D / "
-                  "Side-by-Side display mode (on-board button/menu); beamshell will")
+                  "Side-by-Side display mode (on-board button/menu); zoetrope will")
             print("          -> auto-detect it. Host-side mode-setting isn't available on "
                   "GNOME/Mutter Wayland.")
 
     win = Window(WindowConfig(
         mode=mode,
         monitor_name=args.monitor or (disp.output_name if disp else None),
-        width=1920, height=540, title="beamshell",
+        width=1920, height=540, title="zoetrope",
     ))
     ctx = win.make_gl_context()
     renderer = StereoRenderer(ctx)
@@ -209,7 +209,7 @@ def cmd_watch(args) -> int:
         if child["proc"] is None or child["proc"].poll() is not None:
             print(f"[watch] {glasses.profile.name} connected -> starting shell")
             child["proc"] = subprocess.Popen(
-                [sys.executable, "-m", "beamshell", "run",
+                [sys.executable, "-m", "zoetrope", "run",
                  "--mode", "glasses", "--media", args.media, "--tracker", args.tracker]
                 + (["--library", args.library] if args.library else []))
 
@@ -225,9 +225,9 @@ def cmd_watch(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="beamshell", description=__doc__)
+    p = argparse.ArgumentParser(prog="zoetrope", description=__doc__)
     sub = p.add_subparsers(dest="cmd")
-    default_media = os.environ.get("BEAMSHELL_MEDIA",
+    default_media = os.environ.get("ZOETROPE_MEDIA",
                                    os.path.join(os.path.dirname(os.path.dirname(__file__)), "media"))
 
     r = sub.add_parser("run", help="run the shell")

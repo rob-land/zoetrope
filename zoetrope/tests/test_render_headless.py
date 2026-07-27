@@ -11,8 +11,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from beamshell import mathutil as m, stereo
-from beamshell.scene import Panel
+from zoetrope import mathutil as m, stereo
+from zoetrope.scene import Panel
 
 
 def _make_ctx():
@@ -37,7 +37,7 @@ class TestHeadlessRender(unittest.TestCase):
         return self.ctx.texture((2, 2), 4, bytes(rgba) * 4)
 
     def test_draw_one_frame(self):
-        from beamshell.renderer import StereoRenderer
+        from zoetrope.renderer import StereoRenderer
 
         renderer = StereoRenderer(self.ctx)
         w, h = 640, 360
@@ -65,8 +65,8 @@ class TestHeadlessRender(unittest.TestCase):
         """Full launcher path headlessly: tiles + clock panel + pointer cursor."""
         import tempfile
 
-        from beamshell.renderer import StereoRenderer
-        from beamshell.shell import Shell
+        from zoetrope.renderer import StereoRenderer
+        from zoetrope.shell import Shell
 
         renderer = StereoRenderer(self.ctx)
         w, h = 640, 360
@@ -85,7 +85,7 @@ class TestHeadlessRender(unittest.TestCase):
 
     def test_draw_mono_frame(self):
         """The 2D (mono) path — single full-frame viewport — must also render."""
-        from beamshell.renderer import StereoRenderer
+        from zoetrope.renderer import StereoRenderer
 
         renderer = StereoRenderer(self.ctx)
         w, h = 640, 360

@@ -89,7 +89,7 @@ def _photo_thumb(path: str):
 
 def _thumbs_cache_dir() -> str:
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    return os.path.join(cache, "beamshell", "thumbs")
+    return os.path.join(cache, "zoetrope", "thumbs")
 
 
 def _movie_thumb(path: str):

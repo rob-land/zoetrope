@@ -1,9 +1,9 @@
 """Movie library discovery + the ripplay engine seam.
 
-beamshell does not know how to detect or convert 3D formats itself —
+zoetrope does not know how to detect or convert 3D formats itself —
 that's ripplay's job (shared with the Ripsaw ripper). This module:
 
-- finds the user's library (``$BEAMSHELL_LIBRARY``, else Ripsaw's
+- finds the user's library (``$ZOETROPE_LIBRARY``, else Ripsaw's
   ``library_root`` from ``~/.config/ripsaw/config.json``);
 - scans it for movies, deriving titles and poster art from the
   Jellyfin-style naming Ripsaw writes (``Title (Year)/…``,
@@ -48,7 +48,7 @@ def ripsaw_library_root() -> str | None:
 def library_roots(media_dir: str | None = None,
                   explicit: str | None = None) -> list[str]:
     """Candidate roots, most specific first, existing dirs only, deduped."""
-    candidates = [explicit, os.environ.get("BEAMSHELL_LIBRARY"),
+    candidates = [explicit, os.environ.get("ZOETROPE_LIBRARY"),
                   ripsaw_library_root(), media_dir]
     out: list[str] = []
     for c in candidates:

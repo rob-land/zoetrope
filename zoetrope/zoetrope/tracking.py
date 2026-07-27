@@ -196,7 +196,7 @@ def parse_opentrack_packet(buf: bytes) -> tuple[float, ...] | None:
     return struct.unpack_from("<6d", buf, 0)
 
 
-# NWU (x fwd, y left, z up) -> beamshell (X right, Y up, -Z fwd): the driver's
+# NWU (x fwd, y left, z up) -> zoetrope (X right, Y up, -Z fwd): the driver's
 # yaw axis (z-up) maps to our +Y, but its pitch axis (y-left) maps to our -X and
 # its roll axis (x-fwd) to our -Z, so pitch and roll need flipping. Hardware-
 # verified 2026-07-19: yaw correct, pitch inverted without the flip (roll flip
@@ -206,9 +206,9 @@ DEFAULT_OT_SIGNS = (1.0, -1.0, -1.0)
 
 def opentrack_to_quat(yaw_deg: float, pitch_deg: float, roll_deg: float,
                       signs: tuple[float, float, float] = DEFAULT_OT_SIGNS) -> Quat:
-    """Driver euler (NWU frame, degrees) -> beamshell quat (Y up, -Z forward,
+    """Driver euler (NWU frame, degrees) -> zoetrope quat (Y up, -Z forward,
     head_yaw positive = looking right). See DEFAULT_OT_SIGNS for the axis-sign
-    reasoning; override live via BEAMSHELL_OT_SIGNS="1,-1,-1" if needed.
+    reasoning; override live via ZOETROPE_OT_SIGNS="1,-1,-1" if needed.
     """
     qy = m.q_from_axis_angle((0.0, 1.0, 0.0), math.radians(yaw_deg) * signs[0])
     qx = m.q_from_axis_angle((1.0, 0.0, 0.0), math.radians(pitch_deg) * signs[1])
@@ -237,7 +237,7 @@ def parse_breezy_imu(buf: bytes, now_ms: int | None = None,
 class XRDriverTracker(_Recenterable):
     """3DoF orientation from wheaney/XRLinuxDriver (see format notes above).
 
-    Listens on the opentrack UDP port (the free channel; beamshell's packaged
+    Listens on the opentrack UDP port (the free channel; zoetrope's packaged
     config enables it) and falls back to the Breezy shm file when it is present,
     fresh and parity-clean (licensed installs). Raises when the driver doesn't
     appear to be installed/running so `--tracker auto` can fall through.
@@ -251,13 +251,13 @@ class XRDriverTracker(_Recenterable):
         if not self._breezy and not os.path.exists(XR_DRIVER_STATE_FILE):
             raise FileNotFoundError(
                 "XRLinuxDriver not detected (no /dev/shm/xr_driver_state)")
-        signs = os.environ.get("BEAMSHELL_OT_SIGNS", "")
+        signs = os.environ.get("ZOETROPE_OT_SIGNS", "")
         try:
             s = tuple(float(v) for v in signs.split(","))
             self._signs = s if len(s) == 3 else DEFAULT_OT_SIGNS
         except ValueError:
             self._signs = DEFAULT_OT_SIGNS
-        port = port or int(os.environ.get("BEAMSHELL_OPENTRACK_PORT", OPENTRACK_PORT))
+        port = port or int(os.environ.get("ZOETROPE_OPENTRACK_PORT", OPENTRACK_PORT))
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._sock.bind(("127.0.0.1", port))

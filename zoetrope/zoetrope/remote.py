@@ -1,8 +1,8 @@
 """Phone-as-touchpad: a tiny web remote served over the LAN.
 
 On a Linux phone the phone screen itself will be the touchpad (the Nebula
-pattern); until beamshell runs *on* the phone, and for laptop-kiosk sessions,
-any phone browser works: `beamshell run --remote 8577`, open the printed URL,
+pattern); until zoetrope runs *on* the phone, and for laptop-kiosk sessions,
+any phone browser works: `zoetrope run --remote 8577`, open the printed URL,
 and the page becomes a touchpad speaking the shell's shared event vocabulary
 (tap=open, horizontal swipe=prev/next|size, vertical swipe=push/pull, buttons
 for back/recenter, plus a text field that types into text-mode apps like the
@@ -29,7 +29,7 @@ ALLOWED_EVENTS = {"prev", "next", "up", "down", "activate", "back", "recenter"}
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>beamshell remote</title>
+<title>zoetrope remote</title>
 <style>
  body { margin:0; background:#0a0e14; color:#dce6ee; font-family:sans-serif;
         display:flex; flex-direction:column; height:100dvh; }
@@ -130,7 +130,7 @@ class RemoteServer:
         self._httpd = ThreadingHTTPServer((bind, port), Handler)
         self.port = self._httpd.server_port
         self._thread = threading.Thread(
-            target=self._httpd.serve_forever, name="beamshell-remote", daemon=True)
+            target=self._httpd.serve_forever, name="zoetrope-remote", daemon=True)
         self._thread.start()
 
     def _enqueue(self, msg) -> None:
