@@ -1,15 +1,15 @@
-"""Movie library discovery + the ripplay engine seam.
+"""Movie library discovery + the stereoscope engine seam.
 
 zoetrope does not know how to detect or convert 3D formats itself —
-that's ripplay's job (shared with the Ripsaw ripper). This module:
+that's stereoscope's job (shared with the Ripsaw ripper). This module:
 
 - finds the user's library (``$ZOETROPE_LIBRARY``, else Ripsaw's
   ``library_root`` from ``~/.config/ripsaw/config.json``);
 - scans it for movies, deriving titles and poster art from the
   Jellyfin-style naming Ripsaw writes (``Title (Year)/…``,
   ``poster.jpg``/``folder.jpg``);
-- wraps the ``ripplay probe`` (JSON: what is this file, how to play it)
-  and ``ripplay stream`` (composed Full-SBS NUT on stdout) CLI.
+- wraps the ``stereoscope probe`` (JSON: what is this file, how to play it)
+  and ``stereoscope stream`` (composed Full-SBS NUT on stdout) CLI.
 
 Everything except the subprocess calls is pure and unit-testable.
 """
@@ -183,16 +183,16 @@ def scan_photos(roots: list[str], limit: int = 500) -> list[Photo]:
     return out
 
 
-# --- ripplay engine seam ----------------------------------------------------
+# --- stereoscope engine seam ----------------------------------------------------
 
-def ripplay_bin() -> str | None:
-    return os.environ.get("RIPPLAY_BIN") or shutil.which("ripplay")
+def stereoscope_bin() -> str | None:
+    return os.environ.get("STEREOSCOPE_BIN") or shutil.which("stereoscope")
 
 
 def probe(path: str, target: tuple[int, int] = (3840, 1080)) -> dict | None:
-    """``ripplay probe`` JSON for a file, or None when ripplay is missing
+    """``stereoscope probe`` JSON for a file, or None when stereoscope is missing
     or fails (callers fall back to filename heuristics)."""
-    exe = ripplay_bin()
+    exe = stereoscope_bin()
     if not exe:
         return None
     try:
@@ -206,8 +206,8 @@ def probe(path: str, target: tuple[int, int] = (3840, 1080)) -> dict | None:
 
 def stream_command(path: str,
                    target: tuple[int, int] = (3840, 1080)) -> list[str] | None:
-    """argv for ``ripplay stream`` (composed Full-SBS NUT on stdout)."""
-    exe = ripplay_bin()
+    """argv for ``stereoscope stream`` (composed Full-SBS NUT on stdout)."""
+    exe = stereoscope_bin()
     if not exe:
         return None
     return [exe, "stream", "--target", f"{target[0]}x{target[1]}", path]

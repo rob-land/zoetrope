@@ -63,10 +63,10 @@ the Linux-phone posture where the phone screen is the primary input (`../docs/12
 `$ZOETROPE_LIBRARY`, or — with zero setup — Ripsaw's `library_root`
 (`~/.config/ripsaw/config.json`). Jellyfin-style `Title (Year)` folders give the
 tiles their names and `poster.jpg`/`folder.jpg` art. Opening a title probes it
-through the **ripplay engine** (`ripplay` on PATH or `$RIPPLAY_BIN`): packed SBS
+through the **stereoscope engine** (`stereoscope` on PATH or `$STEREOSCOPE_BIN`): packed SBS
 files play directly in libmpv, while H.264 MVC (straight off a 3D Blu-ray rip),
-MV-HEVC, and over-under stream through `ripplay stream` as composed Full-SBS.
-Without ripplay installed, packed-SBS files still play via filename heuristics.
+MV-HEVC, and over-under stream through `stereoscope stream` as composed Full-SBS.
+Without stereoscope installed, packed-SBS files still play via filename heuristics.
 
 **Photos.** The "3D Gallery" tile flips through every still it finds in the
 media dir + library (left/right arrows navigate): `.mpo`, `.jps`, wide SBS

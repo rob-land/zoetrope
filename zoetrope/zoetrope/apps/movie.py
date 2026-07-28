@@ -37,8 +37,8 @@ class MovieApp(App):
         self._panel = self._open(path, get_proc_address, fbo_size, probe)
 
     def _open(self, path, get_proc_address, fbo_size, report) -> Panel:
-        """Decide how to play: ripplay-probed files stream composed
-        Full-SBS through `ripplay stream` when needed and play packed
+        """Decide how to play: stereoscope-probed files stream composed
+        Full-SBS through `stereoscope stream` when needed and play packed
         files directly; unprobed files keep the caller's stereo/fbo."""
         media = path
         if report is None:
@@ -53,10 +53,10 @@ class MovieApp(App):
                 cmd = library.stream_command(path)
                 if cmd is None:
                     return self._error([
-                        "This format needs the ripplay engine,",
+                        "This format needs the stereoscope engine,",
                         "which isn't installed:",
-                        "cargo install --path ~/projects/ripplay",
-                        "(or set RIPPLAY_BIN)"])
+                        "cargo install --path ~/projects/stereoscope",
+                        "(or set STEREOSCOPE_BIN)"])
                 self._stream_proc = subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
                 media = f"fd://{self._stream_proc.stdout.fileno()}"

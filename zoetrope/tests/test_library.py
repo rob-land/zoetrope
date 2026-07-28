@@ -1,4 +1,4 @@
-"""Pure-logic tests for the movie library / ripplay seam (no subprocess)."""
+"""Pure-logic tests for the movie library / stereoscope seam (no subprocess)."""
 import json
 import os
 

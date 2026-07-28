@@ -192,9 +192,9 @@ class Shell:
         return tiles
 
     def _open_movie(self, mv: library.Movie) -> App | None:
-        """Probe through ripplay (3D format + how to play), then hand the
+        """Probe through stereoscope (3D format + how to play), then hand the
         result to MovieApp so streamed formats (MVC, MV-HEVC, TAB) go
-        through `ripplay stream` and packed files play directly."""
+        through `stereoscope stream` and packed files play directly."""
         report = library.probe(mv.path)
         return MovieApp(self.ctx, mv.path, self.get_proc_address, probe=report)
 
