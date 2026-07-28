@@ -28,6 +28,8 @@ it is flagged inline.
 | [13 — App catalog & roadmap](13-app-catalog-and-roadmap.md) | What's worth building for a face-worn display; walking/driving analysis; backlog + milestones |
 | [14 — UI research: Nebula / Horizon OS / visionOS](14-ui-research-nebula-quest-visionos.md) | What the three shipping spatial UIs teach zoetrope; ranked adoption list, comfort numbers, pitfalls registry, Fairphone 5 as the mobile reference target |
 | [15 — UI research round 2](15-ui-research-round2.md) | Viture/Rokid/RayNeo, Android XR + Project Aura, Daydream/Oculus Go canon, Linux spatial prior art (M2: pywlroots), 10-foot + ambient grammar for the movie picker and couch |
+| [16 — Suite design language](16-suite-design-language.md) | The overarching design system unifying zoetrope · couch · hearth: Adwaita as mother tongue, angular tokens, shared grammars and services |
+| [17 — Zoetrope UI spec](17-zoetrope-ui-spec.md) | Normative glasses-interface design: rails, theater recipe, focus/reticle numbers, Adwaita-through-glass palette, presets/follow modes, session restore; Mirage Solo contingency |
 | [Appendix — Raw evidence](appendix-raw-evidence.md) | Verbatim dumps: partitions, props, services, sensors, camera configs |
 
 A runnable v0.1 of the shell lives in [`../zoetrope/`](../zoetrope/) (18 passing unit tests).
