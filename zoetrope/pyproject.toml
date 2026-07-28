@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A Nebula-like spatial shell for XREAL glasses on Linux (laptop + Wayland phone)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { text = "GPL-3.0-or-later" }
 authors = [{ name = "beampro project" }]
 
 # Core (pure-logic) has NO runtime deps. These are for the GL/IO/app layers.
