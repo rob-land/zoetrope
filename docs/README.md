@@ -26,6 +26,7 @@ it is flagged inline.
 | [11 — XR landscape & vision](11-xr-landscape-and-vision.md) | Research pass over the Linux XR ecosystem + what zoetrope 1.0 is (phone + desktop, two postures) |
 | [12 — Interaction design](12-interaction-design.md) | How you drive it: input matrix per platform, the layer model, display-behavior modes |
 | [13 — App catalog & roadmap](13-app-catalog-and-roadmap.md) | What's worth building for a face-worn display; walking/driving analysis; backlog + milestones |
+| [14 — UI research: Nebula / Horizon OS / visionOS](14-ui-research-nebula-quest-visionos.md) | What the three shipping spatial UIs teach zoetrope; ranked adoption list, comfort numbers, pitfalls registry, Fairphone 5 as the mobile reference target |
 | [Appendix — Raw evidence](appendix-raw-evidence.md) | Verbatim dumps: partitions, props, services, sensors, camera configs |
 
 A runnable v0.1 of the shell lives in [`../zoetrope/`](../zoetrope/) (18 passing unit tests).
