@@ -95,6 +95,28 @@ def mono_matrices(
     return (EyeMatrices(view=view, proj=proj, viewport=Rect(0, 0, width, height)),)
 
 
+# Eye-center offset from the neck pivot: ~7.5 cm above, ~8 cm forward
+# (-Z). The standard Daydream/GVR neck-model constants.
+NECK_PIVOT_TO_EYES: Vec3 = (0.0, 0.075, -0.08)
+
+
+def apply_neck_model(pose: HeadPose, factor: float = 1.0) -> HeadPose:
+    """Synthesize head translation from rotation for 3DoF trackers.
+
+    A real head doesn't rotate about the eyes — it pivots at the neck,
+    so looking around translates the eyes by a few centimetres. 3DoF
+    IMUs report orientation only; without this, panels feel glued to an
+    eyeball rather than sitting in space (Daydream made a neck model a
+    hard app requirement). At identity orientation the offset is zero,
+    so recentering behaves unchanged. `factor` scales the effect
+    (0 disables; 1 is anatomical).
+    """
+    rotated = m.q_rotate(pose.orientation, NECK_PIVOT_TO_EYES)
+    offset = m.v_scale(m.v_sub(rotated, NECK_PIVOT_TO_EYES), factor)
+    return HeadPose(orientation=pose.orientation,
+                    position=m.v_add(pose.position, offset))
+
+
 def head_forward(pose: HeadPose) -> Vec3:
     """Unit vector the head is looking along (-Z in view space)."""
     return m.q_rotate(pose.orientation, (0.0, 0.0, -1.0))

@@ -16,6 +16,7 @@ import time
 
 from . import detect, display as display_mod
 from .config import PROFILES, GlassesProfile
+from . import stereo as stereo_mod
 from .stereo import HeadPose, eye_matrices, mono_matrices
 
 
@@ -174,7 +175,10 @@ def cmd_run(args) -> int:
                 shell.on_text(typed)
             win.text_mode = shell.wants_text()
 
-            pose = HeadPose(orientation=tracker.get_orientation())
+            # 3DoF trackers give orientation only; the neck model
+            # synthesizes the few cm of eye translation a real head has.
+            pose = stereo_mod.apply_neck_model(
+                HeadPose(orientation=tracker.get_orientation()))
             shell.update(dt, pose)
 
             fb_w, fb_h = win.framebuffer_size()

@@ -531,3 +531,33 @@ class TestPointerSelection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNeckModel(unittest.TestCase):
+    def test_identity_orientation_gives_zero_offset(self):
+        from zoetrope import stereo
+        p = stereo.apply_neck_model(stereo.HeadPose())
+        for c in p.position:
+            self.assertAlmostEqual(c, 0.0)
+
+    def test_yaw_translates_eyes_sideways(self):
+        import math
+
+        from zoetrope import mathutil as m
+        from zoetrope import stereo
+        q = m.q_from_axis_angle((0, 1, 0), math.radians(90))
+        p = stereo.apply_neck_model(stereo.HeadPose(orientation=q))
+        # Looking 90 deg left/right swings the forward-offset eyes to the
+        # side: |x| == forward offset (8 cm), z returns toward the pivot.
+        self.assertAlmostEqual(abs(p.position[0]), 0.08, places=3)
+        self.assertAlmostEqual(p.position[2], 0.08, places=3)
+        self.assertAlmostEqual(p.position[1], 0.0, places=6)
+
+    def test_factor_zero_disables(self):
+        import math
+
+        from zoetrope import mathutil as m
+        from zoetrope import stereo
+        q = m.q_from_axis_angle((1, 0, 0), math.radians(45))
+        p = stereo.apply_neck_model(stereo.HeadPose(orientation=q), factor=0.0)
+        self.assertEqual(p.position, (0.0, 0.0, 0.0))
