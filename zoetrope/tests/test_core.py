@@ -511,11 +511,19 @@ class TestWindowManipulation(unittest.TestCase):
             sh.Shell.on_closer(s)
         self.assertTrue(approx(s._app_dist, sh.APP_DIST_RANGE[0]))
 
-    def test_launcher_mode_ignores_push_pull(self):
+    def test_launcher_mode_up_down_switch_rails_not_distance(self):
+        from zoetrope import scene as sc
         from zoetrope import shell as sh
-        s = self._app_shell(mode=sh.LAUNCHER)
-        sh.Shell.on_farther(s)
+        rails = sc.LauncherScene(sc.CylinderLayout())
+        rails.set_rows([[sc.Panel(id="a", title="a", yaw_deg=0.0, y_m=0.26)],
+                        [sc.Panel(id="b", title="b", yaw_deg=0.0, y_m=-0.22)]])
+        s = self._app_shell(mode=sh.LAUNCHER, scene=rails,
+                            _nav_this_frame=False)
         sh.Shell.on_closer(s)
+        self.assertEqual(rails.row, 1)
+        sh.Shell.on_farther(s)
+        self.assertEqual(rails.row, 0)
+        # Distance is untouched in the launcher.
         self.assertTrue(approx(s._app_dist, sh.APP_DIST_DEFAULT))
 
 
@@ -561,3 +569,50 @@ class TestNeckModel(unittest.TestCase):
         q = m.q_from_axis_angle((1, 0, 0), math.radians(45))
         p = stereo.apply_neck_model(stereo.HeadPose(orientation=q), factor=0.0)
         self.assertEqual(p.position, (0.0, 0.0, 0.0))
+
+
+class TestRails(unittest.TestCase):
+    def _scene(self, counts, step=20.0, span=80.0):
+        sc_ = scene.LauncherScene(scene.CylinderLayout(
+            step_deg=step, arc_span_deg=span))
+        rows = [[scene.Panel(id=f"{i}:{j}", title="", yaw_deg=0.0,
+                             y_m=0.26 if i == 0 else -0.22)
+                 for j in range(n)] for i, n in enumerate(counts)]
+        sc_.set_rows(rows)
+        return sc_
+
+    def test_long_row_recenters_on_focus(self):
+        sc_ = self._scene([8, 3])
+        # 8 * 20deg exceeds the 80deg span -> leanback scroll: selected
+        # column sits at yaw 0.
+        sc_.move_selection(+3)
+        self.assertTrue(approx(sc_.selected_panel.yaw_deg, 0.0))
+        # Neighbour steps outward by step_deg.
+        self.assertTrue(approx(sc_.rows[0][4].yaw_deg, 20.0))
+
+    def test_per_row_focus_memory(self):
+        sc_ = self._scene([5, 3])
+        sc_.move_selection(+2)
+        sc_.move_row(+1)
+        sc_.move_selection(+1)
+        sc_.move_row(-1)
+        self.assertEqual(sc_.selected_panel.id, "0:2")
+
+    def test_gaze_gravity_picks_row_by_pitch(self):
+        import math
+
+        from zoetrope import mathutil as m
+        from zoetrope.stereo import HeadPose
+        sc_ = self._scene([3, 3])
+        down = m.q_from_axis_angle((1, 0, 0), math.radians(-10))
+        sc_.select_by_gaze(HeadPose(orientation=down))
+        self.assertEqual(sc_.row, 1)
+        up = m.q_from_axis_angle((1, 0, 0), math.radians(9))
+        sc_.select_by_gaze(HeadPose(orientation=up))
+        self.assertEqual(sc_.row, 0)
+
+    def test_flat_selected_index_spans_rows(self):
+        sc_ = self._scene([3, 2])
+        sc_.move_row(+1)
+        sc_.move_selection(+1)
+        self.assertEqual(sc_.selected, 4)   # 3 in row 0 + col 1

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from . import mathutil as m
 from .mathutil import Mat4, Vec3
-from .stereo import HeadPose, head_yaw
+from .stereo import HeadPose, head_pitch, head_yaw
 
 
 @dataclass
@@ -60,48 +60,119 @@ class CylinderLayout:
 
 
 class LauncherScene:
+    """Stacked leanback rails on the cylinder (doc 17 §2).
+
+    Rows scroll horizontally with per-row focus memory; a long row
+    re-centers on its focused column so the selection stays inside the
+    comfort cone. ``set_panels`` remains as the single-row shorthand.
+    """
+
     def __init__(self, layout: CylinderLayout | None = None):
         self.layout = layout or CylinderLayout()
-        self.panels: list[Panel] = []
-        self.selected: int = 0
+        self.rows: list[list[Panel]] = []
+        self.row: int = 0
+        self._col: dict[int, int] = {}   # per-row focus memory
+
+    # -- content -------------------------------------------------------------
+
+    def set_rows(self, rows: list[list[Panel]]) -> None:
+        self.rows = [r for r in rows if r]
+        self.row = min(self.row, max(0, len(self.rows) - 1))
+        for i, r in enumerate(self.rows):
+            self._col[i] = min(self._col.get(i, 0), len(r) - 1)
+        self._relayout()
 
     def set_panels(self, panels: list[Panel]) -> None:
-        self.panels = panels
-        self._relayout()
-        self.selected = min(self.selected, max(0, len(panels) - 1))
+        """Single-row shorthand (kept for pages that are one rail)."""
+        self.set_rows([panels] if panels else [])
+
+    @property
+    def panels(self) -> list[Panel]:
+        return [p for r in self.rows for p in r]
+
+    # -- layout --------------------------------------------------------------
 
     def _relayout(self) -> None:
-        n = len(self.panels)
-        for i, p in enumerate(self.panels):
-            p.yaw_deg = self.layout.yaw_for_index(i, n)
+        for i, row in enumerate(self.rows):
+            self._relayout_row(i, row)
 
-    def select_by_yaw(self, yaw_deg: float) -> int:
-        """Select (and return) the panel whose azimuth is nearest `yaw_deg`."""
-        if not self.panels:
-            return -1
-        best_i, best_d = 0, float("inf")
-        for i, p in enumerate(self.panels):
-            d = abs(_wrap180(yaw_deg - p.yaw_deg))
-            if d < best_d:
-                best_i, best_d = i, d
-        self.selected = best_i
-        return best_i
+    def _relayout_row(self, i: int, row: list[Panel]) -> None:
+        n = len(row)
+        span = self.layout.step_deg * (n - 1)
+        if span <= self.layout.arc_span_deg:
+            for j, p in enumerate(row):
+                p.yaw_deg = self.layout.yaw_for_index(j, n)
+        else:
+            # Leanback scroll: center the focused column; neighbours
+            # step outward, clamped by nothing (off-arc cards are simply
+            # behind the viewer until scrolled to).
+            sel = self._col.get(i, 0)
+            for j, p in enumerate(row):
+                p.yaw_deg = self.layout.step_deg * (j - sel)
 
-    def select_by_gaze(self, pose: HeadPose) -> int:
-        """Select the panel the head is pointing at."""
-        return self.select_by_yaw(math.degrees(head_yaw(pose)))
+    # -- selection -----------------------------------------------------------
 
-    def move_selection(self, delta: int) -> int:
-        if not self.panels:
-            return -1
-        self.selected = max(0, min(len(self.panels) - 1, self.selected + delta))
-        return self.selected
+    @property
+    def selected(self) -> int:
+        """Flat index of the selection (renderer/back-compat)."""
+        flat = 0
+        for i, r in enumerate(self.rows):
+            if i == self.row:
+                return flat + self._col.get(i, 0)
+            flat += len(r)
+        return -1
 
     @property
     def selected_panel(self) -> Panel | None:
-        if 0 <= self.selected < len(self.panels):
-            return self.panels[self.selected]
-        return None
+        if not self.rows:
+            return None
+        r = self.rows[self.row]
+        return r[min(self._col.get(self.row, 0), len(r) - 1)]
+
+    def move_selection(self, delta: int) -> int:
+        if not self.rows:
+            return -1
+        r = self.rows[self.row]
+        col = max(0, min(len(r) - 1, self._col.get(self.row, 0) + delta))
+        self._col[self.row] = col
+        self._relayout_row(self.row, r)
+        return col
+
+    def move_row(self, delta: int) -> int:
+        if not self.rows:
+            return -1
+        self.row = max(0, min(len(self.rows) - 1, self.row + delta))
+        return self.row
+
+    def select_by_yaw(self, yaw_deg: float) -> int:
+        """Select the current row's panel nearest `yaw_deg` (pointer)."""
+        if not self.rows:
+            return -1
+        row = self.rows[self.row]
+        best_j, best_d = 0, float("inf")
+        for j, p in enumerate(row):
+            d = abs(_wrap180(yaw_deg - p.yaw_deg))
+            if d < best_d:
+                best_j, best_d = j, d
+        self._col[self.row] = best_j
+        self._relayout_row(self.row, row)
+        return best_j
+
+    def select_by_gaze(self, pose: HeadPose) -> int:
+        """Gaze gravity: pick the row by head pitch, the column by yaw —
+        the gaze snaps to the card grid, never a free cursor."""
+        if not self.rows:
+            return -1
+        pitch = math.degrees(head_pitch(pose))
+        best_i, best_d = self.row, float("inf")
+        for i, row in enumerate(self.rows):
+            row_pitch = math.degrees(
+                math.atan2(row[0].y_m, self.layout.radius_m))
+            d = abs(pitch - row_pitch)
+            if d < best_d:
+                best_i, best_d = i, d
+        self.row = best_i
+        return self.select_by_yaw(math.degrees(head_yaw(pose)))
 
 
 def _wrap180(deg: float) -> float:

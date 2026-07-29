@@ -122,6 +122,12 @@ def head_forward(pose: HeadPose) -> Vec3:
     return m.q_rotate(pose.orientation, (0.0, 0.0, -1.0))
 
 
+def head_pitch(pose: HeadPose) -> float:
+    """Elevation (radians) of the head's forward direction; positive = up."""
+    fx, fy, fz = head_forward(pose)
+    return math.atan2(fy, math.hypot(fx, fz))
+
+
 def head_yaw(pose: HeadPose) -> float:
     """Azimuth (radians) of the head's forward direction; 0 = straight ahead (-Z)."""
     fx, _, fz = head_forward(pose)

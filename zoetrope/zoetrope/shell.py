@@ -135,6 +135,7 @@ class Tile:
     open: Callable[[], App | None]
     icon: str | None = None
     thumb: object | None = None      # PIL image for the card background
+    poster: bool = False             # 2:3 poster card instead of 16:10 tile
 
 
 class Shell:
@@ -156,29 +157,42 @@ class Shell:
         self._app_scale = 1.0                    # focused-window user zoom
         self._app_dist = APP_DIST_DEFAULT        # focused-window distance (m)
         self._page = "home"
-        self._tiles = self._build_home_tiles()
+        self._rows = self._build_home_rows()
+        self._tiles = [t for r in self._rows for t in r]
         self._install_tiles()
         self._clock = self._install_clock()
 
     # --- tiles -------------------------------------------------------------
-    def _build_home_tiles(self) -> list[Tile]:
+    # Home rail geometry (doc 17 §2): movie posters above, apps below,
+    # ambient strip at the bottom edge.
+    HOME_RAIL_MOVIES = 8
+
+    def _build_home_rows(self) -> list[list[Tile]]:
         photos = library.scan_photos(self.library_roots)
-        movies = library.scan_movies(self.library_roots, limit=self.MOVIE_PAGE_LIMIT)
+        movies = library.scan_movies(self.library_roots,
+                                     limit=self.HOME_RAIL_MOVIES)
         movie_sub = (f"{len(movies)} title{'s' if len(movies) != 1 else ''}"
                      if movies else "no library found")
         photo_sub = (f"{len(photos)} photo{'s' if len(photos) != 1 else ''}"
                      if photos else "no photos")
-        return [
+        movie_rail = [
+            Tile(f"home-movie:{i}", mv.title, "",
+                 lambda m=mv: self._open_movie(m),
+                 icon="movie", thumb=_poster_thumb(mv), poster=True)
+            for i, mv in enumerate(movies)
+        ]
+        app_rail = [
             Tile("gallery", "3D Gallery", photo_sub,
                  lambda ps=photos: GalleryApp(self.ctx, ps),
                  icon="photo",
                  thumb=_photo_thumb(photos[0].path) if photos else None),
-            Tile("movies", "3D Movies", movie_sub,
+            Tile("movies", "All Movies", movie_sub,
                  self._open_movies_page, icon="movie",
                  thumb=_poster_thumb(movies[0]) if movies else None),
             Tile("term", "Terminal", os.path.basename(os.environ.get("SHELL", "sh")),
                  self._open_term, icon="term"),
         ]
+        return [r for r in (movie_rail, app_rail) if r]
 
     def _build_movie_tiles(self) -> list[Tile]:
         movies = library.scan_movies(self.library_roots, limit=self.MOVIE_PAGE_LIMIT)
@@ -208,8 +222,9 @@ class Shell:
 
     def _set_page(self, page: str) -> None:
         self._page = page
-        self._tiles = (self._build_home_tiles() if page == "home"
-                       else self._build_movie_tiles())
+        self._rows = (self._build_home_rows() if page == "home"
+                      else [self._build_movie_tiles()])
+        self._tiles = [t for r in self._rows for t in r]
         self._install_tiles()
 
     def _open_term(self):
@@ -220,17 +235,28 @@ class Shell:
             print("[shell] terminal needs pyte:  pip install -e '.[term]'")
             return None
 
+    # Vertical rail offsets on the cylinder (meters at the arc).
+    ROW_Y = (0.26, -0.22)
+
     def _install_tiles(self) -> None:
-        panels = []
-        for t in self._tiles:
-            panels.append(Panel(
-                id=t.id, title=t.title, yaw_deg=0.0,
-                width_m=0.62, height_m=0.40,
-                texture=make_tile(self.ctx, t.title, t.subtitle,
-                                  icon=t.icon, thumb=t.thumb),
-                stereo_mode="mono",
-            ))
-        self.scene.set_panels(panels)
+        rows = []
+        for i, tiles in enumerate(self._rows):
+            y = self.ROW_Y[i] if i < len(self.ROW_Y) else -0.22 - 0.45 * (i - 1)
+            panels = []
+            for t in tiles:
+                if t.poster:
+                    w_m, h_m, tw, th = 0.42, 0.63, 340, 510
+                else:
+                    w_m, h_m, tw, th = 0.62, 0.40, 512, 320
+                panels.append(Panel(
+                    id=t.id, title=t.title, yaw_deg=0.0,
+                    width_m=w_m, height_m=h_m, y_m=y,
+                    texture=make_tile(self.ctx, t.title, t.subtitle,
+                                      w=tw, h=th, icon=t.icon, thumb=t.thumb),
+                    stereo_mode="mono",
+                ))
+            rows.append(panels)
+        self.scene.set_rows(rows)
 
     def _install_clock(self):
         try:
@@ -278,13 +304,19 @@ class Shell:
             self._app_scale = _clamp(self._app_scale * APP_SCALE_STEP, APP_SCALE_RANGE)
 
     def on_farther(self):
-        """App mode: push the window away."""
-        if self.mode == APP:
+        """Launcher: rail above. App: push the window away."""
+        if self.mode == LAUNCHER:
+            self.scene.move_row(-1)
+            self._nav_this_frame = True
+        elif self.mode == APP:
             self._app_dist = _clamp(self._app_dist + APP_DIST_STEP, APP_DIST_RANGE)
 
     def on_closer(self):
-        """App mode: pull the window in."""
-        if self.mode == APP:
+        """Launcher: rail below. App: pull the window in."""
+        if self.mode == LAUNCHER:
+            self.scene.move_row(+1)
+            self._nav_this_frame = True
+        elif self.mode == APP:
             self._app_dist = _clamp(self._app_dist - APP_DIST_STEP, APP_DIST_RANGE)
 
     def on_activate(self):
