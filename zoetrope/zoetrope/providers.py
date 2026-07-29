@@ -43,6 +43,36 @@ def jellyfin_config(path: str | None = None) -> dict | None:
     return None
 
 
+def jellyfin_server_url(path: str | None = None) -> str | None:
+    """server_url from a partial jellyfin block (pre-pairing)."""
+    try:
+        with open(path or config_path(), "rb") as f:
+            return (json.load(f).get("jellyfin") or {}).get("server_url")
+    except Exception:
+        return None
+
+
+def save_jellyfin_config(creds: dict, path: str | None = None) -> None:
+    """Merge paired credentials into the config file, preserving any
+    other top-level keys."""
+    dest = path or config_path()
+    try:
+        with open(dest, "rb") as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+    cfg["jellyfin"] = {
+        "server_url": creds.get("server_url"),
+        "access_token": creds.get("access_token"),
+        "user_id": creds.get("user_id"),
+    }
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    tmp = dest + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f, indent=2)
+    os.replace(tmp, dest)
+
+
 def synth_report(item) -> dict:
     """A stereoscope-probe-shaped report for a network MediaItem.
 
@@ -92,9 +122,12 @@ class ProviderHub:
     def __init__(self, config=_UNSET):
         self._jf_config = (jellyfin_config() if config is ProviderHub._UNSET
                            else config)
+        # A server_url alone (no token yet) still starts the loop so
+        # Quick Connect pairing can run.
+        self._server = (self._jf_config or {}).get("server_url")             or jellyfin_server_url()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._provider = None
-        if self.enabled:
+        if self.enabled or self._server:
             self._loop = asyncio.new_event_loop()
             threading.Thread(target=self._loop.run_forever,
                              name="zoetrope-providers", daemon=True).start()
@@ -102,6 +135,69 @@ class ProviderHub:
     @property
     def enabled(self) -> bool:
         return self._jf_config is not None
+
+    @property
+    def has_server(self) -> bool:
+        return bool(self._server)
+
+    def quick_connect(self, deliver) -> None:
+        """Pair with Jellyfin via Quick Connect (no typing in-glasses).
+
+        ``deliver(dict)`` receives ``{"state": "code", "code": ...}``,
+        then ``{"state": "done"}`` (credentials saved to the config and
+        the hub becomes enabled) or ``{"state": "error", ...}``.
+        """
+        if self._loop is None or not self._server:
+            deliver({"state": "error",
+                     "message": "No jellyfin.server_url configured."})
+            return
+        asyncio.run_coroutine_threadsafe(self._quick_connect(deliver),
+                                         self._loop)
+
+    async def _quick_connect(self, deliver) -> None:
+        try:
+            from suite_providers import SourceConfig
+            from suite_providers.aio import JellyfinProvider
+
+            if self._provider is None:
+                self._provider = JellyfinProvider()
+                self._provider.configure(SourceConfig(
+                    id="jellyfin-zoetrope", provider="jellyfin",
+                    display_name="Jellyfin",
+                    config={"server_url": self._server}))
+            p = self._provider
+            if not await p.quick_connect_enabled():
+                deliver({"state": "error", "message":
+                         "Quick Connect is disabled on the server "
+                         "(enable it in the Jellyfin dashboard)."})
+                return
+            init = await p.quick_connect_initiate()
+            if not init:
+                deliver({"state": "error",
+                         "message": "Could not start Quick Connect."})
+                return
+            deliver({"state": "code", "code": init["code"]})
+            for _ in range(90):
+                await asyncio.sleep(2.0)
+                if await p.quick_connect_poll(init["secret"]):
+                    status = await p.quick_connect_complete(init["secret"])
+                    if status.ok and status.credentials:
+                        creds = dict(status.credentials)
+                        creds["server_url"] = self._server
+                        save_jellyfin_config(creds)
+                        self._jf_config = {
+                            "server_url": self._server,
+                            "access_token": creds.get("access_token"),
+                            "user_id": creds.get("user_id"),
+                        }
+                        deliver({"state": "done"})
+                    else:
+                        deliver({"state": "error",
+                                 "message": status.message or "Sign-in failed."})
+                    return
+            deliver({"state": "error", "message": "Pairing timed out."})
+        except Exception as e:
+            deliver({"state": "error", "message": str(e)})
 
     def refresh_home(self, deliver) -> None:
         """Fetch resume + movie rails; ``deliver(dict)`` is called from

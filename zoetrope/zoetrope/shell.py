@@ -178,7 +178,8 @@ class Shell:
         self.hub = hub
         self._net: dict = {"resume": [], "movies": []}
         self._pending_rails: queue.Queue = queue.Queue()
-        if hub is not None and hub.enabled:
+        self._net_kicked = hub is not None and hub.enabled
+        if self._net_kicked:
             hub.refresh_home(self._pending_rails.put)
         self._rows = self._build_home_rows()
         self._tiles = [t for r in self._rows for t in r]
@@ -226,6 +227,12 @@ class Shell:
             Tile("term", "Terminal", os.path.basename(os.environ.get("SHELL", "sh")),
                  self._open_term, icon="term"),
         ]
+        if (self.hub is not None and self.hub.has_server
+                and not self.hub.enabled):
+            from .apps.connect import QuickConnectApp
+            app_rail.append(Tile(
+                "jellyfin-connect", "Connect Jellyfin", "Quick Connect",
+                lambda: QuickConnectApp(self.ctx, self.hub), icon="movie"))
         return [r for r in (movie_rail, app_rail) if r]
 
     def _build_movie_tiles(self) -> list[Tile]:
@@ -422,6 +429,10 @@ class Shell:
                     self._set_page(self._page)
         except queue.Empty:
             pass
+        if (self.hub is not None and self.hub.enabled
+                and not self._net_kicked):
+            self._net_kicked = True
+            self.hub.refresh_home(self._pending_rails.put)
         if self.mode == LAUNCHER:
             self._update_clock()
             yaw = math.degrees(head_yaw(pose))

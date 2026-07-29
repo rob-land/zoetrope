@@ -211,3 +211,50 @@ def test_hub_disabled_without_config():
     hub._jf_config = None
     assert hub.enabled is False
     hub.refresh_home(lambda d: (_ for _ in ()).throw(AssertionError))
+
+
+def test_save_jellyfin_config_merges(tmp_path):
+    from zoetrope.providers import jellyfin_config, save_jellyfin_config
+    dest = str(tmp_path / "config.json")
+    (tmp_path / "config.json").write_text('{"other": {"keep": true}}')
+    save_jellyfin_config({"server_url": "http://x", "access_token": "t",
+                          "user_id": "u"}, path=dest)
+    import json
+    cfg = json.loads((tmp_path / "config.json").read_text())
+    assert cfg["other"] == {"keep": True}
+    assert jellyfin_config(dest)["access_token"] == "t"
+
+
+def test_quick_connect_state_machine(tmp_path, monkeypatch):
+    import asyncio
+
+    from zoetrope import providers as pr
+
+    class FakeProvider:
+        async def quick_connect_enabled(self):
+            return True
+
+        async def quick_connect_initiate(self):
+            return {"secret": "s", "code": "123456"}
+
+        async def quick_connect_poll(self, secret):
+            return True
+
+        async def quick_connect_complete(self, secret):
+            from suite_providers import AuthStatus
+            return AuthStatus(ok=True, credentials={
+                "access_token": "tok", "user_id": "u9"})
+
+    monkeypatch.setattr(pr, "config_path",
+                        lambda: str(tmp_path / "config.json"))
+    monkeypatch.setattr(pr.asyncio, "sleep",
+                        lambda s: asyncio.sleep(0))
+    hub = pr.ProviderHub(config=None)
+    hub._server = "http://jf"
+    hub._provider = FakeProvider()
+    events = []
+    asyncio.run(hub._quick_connect(events.append))
+    assert [e["state"] for e in events] == ["code", "done"]
+    assert events[0]["code"] == "123456"
+    assert hub.enabled and hub._jf_config["user_id"] == "u9"
+    assert pr.jellyfin_config(str(tmp_path / "config.json"))["access_token"] == "tok"
