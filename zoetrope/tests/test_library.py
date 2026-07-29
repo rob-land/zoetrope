@@ -247,8 +247,9 @@ def test_quick_connect_state_machine(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pr, "config_path",
                         lambda: str(tmp_path / "config.json"))
+    real_sleep = asyncio.sleep
     monkeypatch.setattr(pr.asyncio, "sleep",
-                        lambda s: asyncio.sleep(0))
+                        lambda s: real_sleep(0))
     hub = pr.ProviderHub(config=None)
     hub._server = "http://jf"
     hub._provider = FakeProvider()
