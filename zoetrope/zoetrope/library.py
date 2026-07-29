@@ -27,7 +27,7 @@ POSTER_NAMES = ("poster.jpg", "poster.png", "folder.jpg", "folder.png", "cover.j
 
 # Ripsaw/scene-style suffix slugs that don't belong in a display title.
 _TITLE_NOISE = re.compile(
-    r"(\.(fsbs|hsbs|sbs|tab|ou|halfsbs|3d))+$", re.IGNORECASE)
+    r"(\.(fsbs|hsbs|ftab|htab|fou|hou|sbs|tab|ou|halfsbs|3d))+$", re.IGNORECASE)
 
 
 def ripsaw_config_path() -> str:
