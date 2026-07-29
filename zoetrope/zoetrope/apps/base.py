@@ -201,6 +201,14 @@ class App:
     def nav(self, delta: int) -> None:
         """prev/next while focused (only when handles_nav is True)."""
 
+    def on_activate(self) -> None:
+        """Enter/tap while the app is focused (e.g. play/pause)."""
+
+    def ornament(self) -> Panel | None:
+        """Optional secondary panel floating below the app panel
+        (transport bars etc. — doc 17 §5); None when hidden."""
+        return None
+
     def write_input(self, text: str) -> None:
         pass
 

@@ -146,3 +146,23 @@ def test_shell_wants_void_only_in_app_mode():
     assert sh.Shell.wants_void(s) is False
     s.mode, s.current = sh.APP, None
     assert sh.Shell.wants_void(s) is False
+
+
+def test_transport_timecode_format():
+    from zoetrope.apps.movie import fmt_time
+    assert fmt_time(None) == "--:--"
+    assert fmt_time(0) == "0:00"
+    assert fmt_time(75) == "1:15"
+    assert fmt_time(3671) == "1:01:11"
+
+
+def test_transport_ornament_visibility_rule():
+    from zoetrope.apps.movie import ORNAMENT_LINGER_S, ornament_visible
+    assert ornament_visible(None, 100.0) is False
+    assert ornament_visible(100.0, 100.0 + ORNAMENT_LINGER_S - 0.1) is True
+    assert ornament_visible(100.0, 100.0 + ORNAMENT_LINGER_S + 0.1) is False
+
+
+def test_movie_claims_nav_for_seeking():
+    from zoetrope.apps.movie import MovieApp
+    assert MovieApp.handles_nav is True

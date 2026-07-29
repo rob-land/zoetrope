@@ -37,6 +37,13 @@ APP_DIST_RANGE = (0.9, 4.0)
 APP_DIST_DEFAULT = 1.7
 
 
+def _panel_scale(width_m: float, height_m: float):
+    mat = m.mat4_identity()
+    mat[0] = width_m
+    mat[5] = height_m
+    return mat
+
+
 def _clamp(v: float, lo_hi: tuple[float, float]) -> float:
     return max(lo_hi[0], min(lo_hi[1], v))
 
@@ -320,6 +327,9 @@ class Shell:
             self._app_dist = _clamp(self._app_dist - APP_DIST_STEP, APP_DIST_RANGE)
 
     def on_activate(self):
+        if self.mode == APP and self.current is not None:
+            self.current.on_activate()
+            return
         if self.mode != LAUNCHER:
             return
         panel = self.scene.selected_panel
@@ -373,8 +383,19 @@ class Shell:
     def panels_models(self):
         if self.mode == APP and self.current is not None:
             p = self.current.panel()
-            return [(p, focus_model(p.width_m, p.height_m,
-                                    self._app_dist, self._app_scale))]
+            out = [(p, focus_model(p.width_m, p.height_m,
+                                   self._app_dist, self._app_scale))]
+            orn = self.current.ornament()
+            if orn is not None:
+                # Float the ornament just under the app panel's bottom
+                # edge, slightly nearer the viewer (chrome outside the
+                # content, never over the picture).
+                dy = p.height_m * self._app_scale / 2 + orn.height_m / 2 + 0.05
+                model = m.mat4_mul(
+                    m.mat4_translate((0.0, -dy, -(self._app_dist - 0.05))),
+                    _panel_scale(orn.width_m, orn.height_m))
+                out.append((orn, model))
+            return out
         out = []
         selected = self.scene.selected_panel
         for panel in self.scene.panels:

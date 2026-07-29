@@ -19,9 +19,30 @@ from ..scene import Panel
 from .base import App, message_texture
 
 
+ORNAMENT_LINGER_S = 2.5      # transport auto-hides after this idle time
+
+
+def fmt_time(seconds: float | None) -> str:
+    """mm:ss / h:mm:ss for the transport bar (pure; unit-tested)."""
+    if seconds is None:
+        return "--:--"
+    s = max(0, int(seconds))
+    h, rem = divmod(s, 3600)
+    mn, sec = divmod(rem, 60)
+    return f"{h}:{mn:02d}:{sec:02d}" if h else f"{mn}:{sec:02d}"
+
+
+def ornament_visible(shown_at: float | None, now: float,
+                     linger: float = ORNAMENT_LINGER_S) -> bool:
+    """Pure visibility rule: shown for `linger` seconds after the last
+    transport input, then auto-hidden (doc 17 §5)."""
+    return shown_at is not None and (now - shown_at) < linger
+
+
 class MovieApp(App):
     id = "movie"
     title = "3D Movie"
+    handles_nav = True           # prev/next seek instead of resizing
 
     def __init__(self, ctx, path: str, get_proc_address, stereo_mode: str = "sbs",
                  fbo_size=(1920, 1080), probe: dict | None = None):
@@ -34,6 +55,9 @@ class MovieApp(App):
         self._tex = None
         self._stream_proc: subprocess.Popen | None = None
         self._aspect: float | None = None
+        self._orn_shown_at: float | None = None
+        self._orn_panel = None
+        self._orn_tex = None
         self._panel = self._open(path, get_proc_address, fbo_size, probe)
 
     def _open(self, path, get_proc_address, fbo_size, report) -> Panel:
@@ -108,6 +132,13 @@ class MovieApp(App):
             return self._error(["mpv init failed:", str(e)])
 
     def update(self, dt: float) -> None:
+        import time
+        if (self._orn_shown_at is not None
+                and ornament_visible(self._orn_shown_at, time.monotonic())):
+            self._orn_accum = getattr(self, "_orn_accum", 0.0) + dt
+            if self._orn_accum >= 1.0:
+                self._orn_accum = 0.0
+                self._refresh_ornament()
         # Pull a fresh frame into our FBO if mpv has one ready.
         if self._render is None or self._fbo is None:
             return
@@ -119,6 +150,90 @@ class MovieApp(App):
             self._render.render(flip_y=False, opengl_fbo={
                 "w": w, "h": h, "fbo": self._fbo.glo,
             })
+
+    # -- transport (doc 17 §5) ----------------------------------------------
+
+    def on_activate(self) -> None:
+        """Play/pause; summons the transport ornament."""
+        if self._mpv is not None:
+            try:
+                self._mpv.pause = not self._mpv.pause
+            except Exception:
+                pass
+        self._show_ornament()
+
+    def nav(self, delta: int) -> None:
+        """Seek +-10 s. (Distance via up/down is the seat control; the
+        screen size stays at its cinema preset.)"""
+        if self._mpv is not None:
+            try:
+                self._mpv.seek(10 * delta, "relative")
+            except Exception:
+                pass
+        self._show_ornament()
+
+    def _show_ornament(self) -> None:
+        import time
+        self._orn_shown_at = time.monotonic()
+        self._refresh_ornament()
+
+    def ornament(self) -> Panel | None:
+        import time
+        if not ornament_visible(self._orn_shown_at, time.monotonic()):
+            return None
+        return self._orn_panel
+
+    def _refresh_ornament(self) -> None:
+        """(Re)draw the transport bar texture: play state, progress in
+        the accent color, timecodes. Chrome outside the picture."""
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            return
+        w, h = 1024, 96
+        img = Image.new("RGBA", (w, h), (255, 255, 255, 31))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([2, 2, w - 2, h - 2], radius=20,
+                            outline=(255, 255, 255, 89), width=2)
+        pos = dur = None
+        paused = False
+        if self._mpv is not None:
+            try:
+                pos = self._mpv.time_pos
+                dur = self._mpv.duration
+                paused = bool(self._mpv.pause)
+            except Exception:
+                pass
+        # play/pause glyph
+        gx, gy, gs = 30, 24, 48
+        if paused:
+            d.polygon([(gx, gy), (gx, gy + gs), (gx + gs * 0.8, gy + gs / 2)],
+                      fill=(255, 255, 255, 255))
+        else:
+            bw = int(gs * 0.28)
+            d.rectangle([gx, gy, gx + bw, gy + gs], fill=(255, 255, 255, 255))
+            d.rectangle([gx + gs * 0.5, gy, gx + gs * 0.5 + bw, gy + gs],
+                        fill=(255, 255, 255, 255))
+        # progress track + accent fill
+        tx0, tx1, ty = 110, w - 190, h // 2
+        d.rounded_rectangle([tx0, ty - 4, tx1, ty + 4], radius=4,
+                            fill=(255, 255, 255, 60))
+        if pos is not None and dur:
+            fx = tx0 + (tx1 - tx0) * min(1.0, pos / dur)
+            d.rounded_rectangle([tx0, ty - 4, fx, ty + 4], radius=4,
+                                fill=(53, 132, 228, 255))
+        font = _load_ornament_font()
+        d.text((tx1 + 16, ty - 16), f"{fmt_time(pos)} / {fmt_time(dur)}",
+               font=font, fill=(255, 255, 255, 220))
+        if self._orn_tex is None:
+            from .base import pil_to_texture
+            self._orn_tex = pil_to_texture(self.ctx, img)
+            self._orn_panel = Panel(
+                id="movie-transport", title="transport", yaw_deg=0.0,
+                width_m=1.35, height_m=0.13,
+                texture=self._orn_tex, stereo_mode="mono")
+        else:
+            self._orn_tex.write(img.convert("RGBA").tobytes())
 
     def _error(self, lines) -> Panel:
         lines = list(lines) + ["", "Backspace = back to menu"]
@@ -146,6 +261,11 @@ class MovieApp(App):
                 except Exception:
                     pass
             self._stream_proc = None
+
+
+def _load_ornament_font():
+    from .base import _load_font
+    return _load_font(30)
 
 
 def _wrap(text: str, width: int = 40) -> list[str]:
