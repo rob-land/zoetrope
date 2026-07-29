@@ -189,7 +189,8 @@ def cmd_run(args) -> int:
             else:
                 eyes = mono_matrices(pose, fb_w, fb_h, profile.fov_h_deg)
             renderer.render((fb_w, fb_h), shell.panels_models(), eyes,
-                            shell.floor_model(), shell.selected_id(), cursor=cursor)
+                            shell.floor_model(), shell.selected_id(), cursor=cursor,
+                            void_theater=shell.wants_void())
             win.swap()
     finally:
         shell.close()

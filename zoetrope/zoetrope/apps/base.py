@@ -190,6 +190,7 @@ class App:
     title: str = "App"
     accepts_text: bool = False     # True: keyboard text is routed to write_input
     handles_nav: bool = False      # True: prev/next go to nav() instead of resize
+    wants_void: bool = False       # True: theater purity — blank the stage
 
     def panel(self) -> Panel:
         raise NotImplementedError

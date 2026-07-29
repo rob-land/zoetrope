@@ -386,6 +386,12 @@ class Shell:
             out.append((self._clock, self.scene.layout.model_matrix(self._clock)))
         return out
 
+    def wants_void(self) -> bool:
+        """True while the open app asked for theater purity (movie
+        playback): the renderer blanks the stage layers."""
+        return (self.mode == APP and self.current is not None
+                and getattr(self.current, "wants_void", False))
+
     def wants_text(self) -> bool:
         """True while the open app consumes keyboard text (window.py switches its
         key mapping accordingly)."""

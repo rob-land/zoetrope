@@ -36,10 +36,17 @@ PANEL_FS = """
 uniform sampler2D tex;
 uniform float selected;   // 1.0 if this panel is focused
 uniform float border;     // border half-width in uv units
+uniform float feather;    // edge fade half-width in uv units (0 = off)
 in vec2 v_uv;
 out vec4 frag;
 void main() {
     vec4 c = texture(tex, v_uv);
+    // Feathered frame: soften the panel edges so stereo content doesn't
+    // present a hard stereo-window violation (doc 17 §5).
+    if (feather > 0.0) {
+        vec2 fd = min(v_uv, 1.0 - v_uv);
+        c.a *= smoothstep(0.0, feather, min(fd.x, fd.y));
+    }
     // Accent border when selected; scaled by the card's alpha so it hugs the
     // rounded silhouette instead of drawing a square frame over the corners.
     vec2 d = min(v_uv, 1.0 - v_uv);
@@ -142,20 +149,27 @@ class StereoRenderer:
         return panel.texture, (0.0, 0.0), (1.0, 1.0)
 
     def render(self, fb_size, panels_models, eyes: tuple[EyeMatrices, EyeMatrices],
-               floor_model, selected_id: str | None, target=None, cursor=None):
+               floor_model, selected_id: str | None, target=None, cursor=None,
+               void_theater: bool = False):
         """cursor: optional (yaw_deg, pitch_deg) of the controller ray; drawn as a
-        glowing dot on the panel cylinder."""
+        glowing dot on the panel cylinder. void_theater blanks everything but
+        the panels (pure black on the additive display = nothing drawn) for
+        cinema purity (doc 17 §5)."""
         ctx = self.ctx
         fbo = target if target is not None else ctx.screen
         fbo.use()
-        ctx.clear(0.02, 0.03, 0.05, 1.0)
+        if void_theater:
+            ctx.clear(0.0, 0.0, 0.0, 1.0)
+        else:
+            ctx.clear(0.02, 0.03, 0.05, 1.0)
         for eye_index, eye in enumerate(eyes):
             ctx.viewport = eye.viewport.as_tuple()
             vp = _mul(eye.proj, eye.view)  # proj * view
-            # floor grid
-            self.grid_prog["mvp"].write(_m4(_mul(vp, floor_model)))
-            self.grid_prog["model"].write(_m4(floor_model))
-            self.grid_vao.render(self.moderngl.TRIANGLES)
+            if not void_theater:
+                # floor grid (the anchor layer)
+                self.grid_prog["mvp"].write(_m4(_mul(vp, floor_model)))
+                self.grid_prog["model"].write(_m4(floor_model))
+                self.grid_vao.render(self.moderngl.TRIANGLES)
             # panels
             for panel, model in panels_models:
                 tex, uv_off, uv_scale = self._eye_texture(panel, eye_index)
@@ -167,6 +181,7 @@ class StereoRenderer:
                 self.panel_prog["uv_offset"].value = uv_off
                 self.panel_prog["uv_scale"].value = uv_scale
                 self.panel_prog["selected"].value = 1.0 if panel.id == selected_id else 0.0
+                self.panel_prog["feather"].value = float(panel.data.get("feather", 0.0))
                 self.panel_vao.render(self.moderngl.TRIANGLES)
             if cursor is not None:
                 ctx.disable(self.moderngl.DEPTH_TEST)   # always visible on top

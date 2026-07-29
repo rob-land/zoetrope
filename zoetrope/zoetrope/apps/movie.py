@@ -88,12 +88,22 @@ class MovieApp(App):
             )
             self._mpv.play(path)
             aspect = self._aspect or ((w / 2) / h if self.stereo_mode == "sbs" else w / h)
-            # Keep the panel inside the glasses' ~46 deg horizontal FOV
-            # (1.3 m at the 1.7 m focus distance is ~42 deg).
-            pw = 1.3
-            return Panel(id="movie", title="3D Movie", yaw_deg=0.0,
-                         width_m=pw, height_m=pw / aspect,
-                         texture=self._tex, stereo_mode=self.stereo_mode)
+            # Cinema default: the screen subtends ~60 deg — Carmack's
+            # Netflix-on-Go number; bigger magnifies compression and
+            # forces head-scanning (doc 17 §5). At the 1.7 m focus
+            # distance: 2 * 1.7 * tan(30 deg) ~= 1.96 m. The user's
+            # existing zoom keys scale toward Large/Max from here.
+            import math as _math
+            pw = 2.0 * 1.7 * _math.tan(_math.radians(30.0))
+            self.wants_void = True
+            panel = Panel(id="movie", title="3D Movie", yaw_deg=0.0,
+                          width_m=pw, height_m=pw / aspect,
+                          texture=self._tex, stereo_mode=self.stereo_mode)
+            if self.stereo_mode == "sbs":
+                # Feathered frame hides stereo-window violations at the
+                # screen edges (~20 dmm at this size).
+                panel.data["feather"] = 0.012
+            return panel
         except Exception as e:  # noqa: BLE001
             return self._error(["mpv init failed:", str(e)])
 

@@ -120,3 +120,29 @@ class TestRemoteServer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_movie_cinema_geometry_and_flags():
+    """The theater recipe constants (doc 17 §5) without a GL context."""
+    import math
+    # 60-degree screen at the 1.7 m focus distance.
+    pw = 2.0 * 1.7 * math.tan(math.radians(30.0))
+    assert abs(pw - 1.963) < 0.01
+    from zoetrope.apps.base import App
+    assert App.wants_void is False  # opt-in, per-app
+
+
+def test_shell_wants_void_only_in_app_mode():
+    from types import SimpleNamespace
+
+    from zoetrope import shell as sh
+
+    class Voidy:
+        wants_void = True
+
+    s = SimpleNamespace(mode=sh.APP, current=Voidy())
+    assert sh.Shell.wants_void(s) is True
+    s.mode = sh.LAUNCHER
+    assert sh.Shell.wants_void(s) is False
+    s.mode, s.current = sh.APP, None
+    assert sh.Shell.wants_void(s) is False
