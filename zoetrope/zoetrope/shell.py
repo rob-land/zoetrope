@@ -8,6 +8,7 @@ from __future__ import annotations
 import glob
 import math
 import os
+import queue
 import subprocess
 import time
 from dataclasses import dataclass
@@ -118,6 +119,13 @@ def _movie_thumb(path: str):
         return None
 
 
+def _entry_thumb(entry):
+    """Tile art for a shared-provider RailEntry (cached poster file)."""
+    if entry.poster:
+        return _photo_thumb(entry.poster)
+    return None
+
+
 def _poster_thumb(mv):
     """Tile art for a library movie: Jellyfin poster art when present,
     else a grabbed frame."""
@@ -151,7 +159,7 @@ class Shell:
     MOVIE_PAGE_LIMIT = 24
 
     def __init__(self, ctx, media_dir: str, get_proc_address,
-                 library_dir: str | None = None):
+                 library_dir: str | None = None, hub=None):
         self.ctx = ctx
         self.media_dir = media_dir
         self.get_proc_address = get_proc_address
@@ -164,6 +172,14 @@ class Shell:
         self._app_scale = 1.0                    # focused-window user zoom
         self._app_dist = APP_DIST_DEFAULT        # focused-window distance (m)
         self._page = "home"
+        # Shared-provider rails (suite_providers.aio via ProviderHub):
+        # fetched in the background, delivered through a queue the frame
+        # loop drains — network never blocks a frame.
+        self.hub = hub
+        self._net: dict = {"resume": [], "movies": []}
+        self._pending_rails: queue.Queue = queue.Queue()
+        if hub is not None and hub.enabled:
+            hub.refresh_home(self._pending_rails.put)
         self._rows = self._build_home_rows()
         self._tiles = [t for r in self._rows for t in r]
         self._install_tiles()
@@ -182,12 +198,23 @@ class Shell:
                      if movies else "no library found")
         photo_sub = (f"{len(photos)} photo{'s' if len(photos) != 1 else ''}"
                      if photos else "no photos")
-        movie_rail = [
-            Tile(f"home-movie:{i}", mv.title, "",
-                 lambda m=mv: self._open_movie(m),
-                 icon="movie", thumb=_poster_thumb(mv), poster=True)
-            for i, mv in enumerate(movies)
-        ]
+        resume = self._net.get("resume") or []
+        if resume:
+            # Doc 17 §8a: home's media band is the resume rail once a
+            # backend provides one; the local rail is the fallback.
+            movie_rail = [
+                Tile(f"resume:{i}", e.title, "",
+                     lambda en=e: self._open_entry(en),
+                     icon="movie", thumb=_entry_thumb(e), poster=True)
+                for i, e in enumerate(resume)
+            ]
+        else:
+            movie_rail = [
+                Tile(f"home-movie:{i}", mv.title, "",
+                     lambda m=mv: self._open_movie(m),
+                     icon="movie", thumb=_poster_thumb(mv), poster=True)
+                for i, mv in enumerate(movies)
+            ]
         app_rail = [
             Tile("gallery", "3D Gallery", photo_sub,
                  lambda ps=photos: GalleryApp(self.ctx, ps),
@@ -210,7 +237,21 @@ class Shell:
                 f"movie:{i}", mv.title, os.path.basename(mv.path),
                 lambda m=mv: self._open_movie(m),
                 icon="movie", thumb=_poster_thumb(mv)))
+        seen = {t.title for t in tiles}
+        for i, e in enumerate(self._net.get("movies") or []):
+            if e.title in seen or len(tiles) > self.MOVIE_PAGE_LIMIT:
+                continue
+            tiles.append(Tile(
+                f"net-movie:{i}", e.title, str(e.year or ""),
+                lambda en=e: self._open_entry(en),
+                icon="movie", thumb=_entry_thumb(e)))
         return tiles
+
+    def _open_entry(self, entry) -> App | None:
+        """Open a shared-provider RailEntry: network streams carry a
+        server-synthesized report instead of a local probe."""
+        return MovieApp(self.ctx, entry.url or entry.path,
+                        self.get_proc_address, probe=entry.report)
 
     def _open_movie(self, mv: library.Movie) -> App | None:
         """Probe through stereoscope (3D format + how to play), then hand the
@@ -374,6 +415,13 @@ class Shell:
 
     # --- per-frame ---------------------------------------------------------
     def update(self, dt: float, pose: HeadPose) -> None:
+        try:
+            while True:
+                self._net.update(self._pending_rails.get_nowait())
+                if self.mode == LAUNCHER:
+                    self._set_page(self._page)
+        except queue.Empty:
+            pass
         if self.mode == LAUNCHER:
             self._update_clock()
             yaw = math.degrees(head_yaw(pose))

@@ -91,8 +91,9 @@ def cmd_run(args) -> int:
     renderer = StereoRenderer(ctx)
     tracker = tracking.open_tracker(
         args.tracker, vid=usb.vid if usb else None, sway=args.sway)
+    from .providers import ProviderHub
     shell = Shell(ctx, args.media, win.get_proc_address,
-                  library_dir=args.library)
+                  library_dir=args.library, hub=ProviderHub())
     from .controller import open_controller
     controller = open_controller(args.controller)
     remote = None

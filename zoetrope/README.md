@@ -68,6 +68,15 @@ files play directly in libmpv, while H.264 MVC (straight off a 3D Blu-ray rip),
 MV-HEVC, and over-under stream through `stereoscope stream` as composed Full-SBS.
 Without stereoscope installed, packed-SBS files still play via filename heuristics.
 
+**Jellyfin (shared provider layer).** With a `jellyfin` block in
+`~/.config/zoetrope/config.json` (`server_url`, `access_token`,
+`user_id` — token creation is manual for now), the home rail becomes
+your server's **continue-watching** rail and the movies page gains
+server titles, fed by the same `suite_providers.aio` stack couch
+drives. Server-side 3D tags (`Video3DFormat`) choose the playback
+path: packed-SBS titles stream straight into the theater; formats
+needing local decode say so honestly. No config = local-only.
+
 **Photos.** The "3D Gallery" tile flips through every still it finds in the
 media dir + library (left/right arrows navigate): `.mpo`, `.jps`, wide SBS
 images, explicit `*_l`/`*_r` (or `*-left`/`*-right`) stereo pairs, and flat

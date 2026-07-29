@@ -170,3 +170,44 @@ def test_gallery_next_index_wraps():
     assert next_index(2, +1, 3) == 0
     assert next_index(0, -1, 3) == 2
     assert next_index(5, 0, 0) == 0
+
+
+# --- shared-provider hub (suite_providers bridge) ---------------------------
+
+def test_jellyfin_config_requires_all_keys(tmp_path):
+    from zoetrope import providers
+    p = tmp_path / "config.json"
+    p.write_text('{"jellyfin": {"server_url": "http://x"}}')
+    assert providers.jellyfin_config(str(p)) is None
+    p.write_text('{"jellyfin": {"server_url": "http://x", '
+                 '"access_token": "t", "user_id": "u"}}')
+    assert providers.jellyfin_config(str(p))["user_id"] == "u"
+    assert providers.jellyfin_config(str(tmp_path / "missing.json")) is None
+
+
+def test_synth_report_direct_vs_unsupported():
+    pytest.importorskip("suite_providers")
+    from suite_providers import ContentType, MediaItem
+    from suite_providers.models import StereoConfidence, StereoFormat, StereoHint
+    from zoetrope.providers import synth_report
+
+    def item(fmt):
+        return MediaItem(provider_id="j", provider_item_id="1", title="t",
+                         content_type=ContentType.MOVIE,
+                         stereo=StereoHint(fmt, StereoConfidence.SERVER))
+
+    assert synth_report(item(StereoFormat.SBS_HALF))["playback"]["type"] == "direct"
+    assert synth_report(item(StereoFormat.MONO))["playback"]["type"] == "direct"
+    r = synth_report(item(StereoFormat.MVC))
+    assert r["playback"]["type"] == "unsupported"
+    assert r["playback"]["can_play_2d"] is True
+    assert r["format"] == "mvc"
+
+
+def test_hub_disabled_without_config():
+    from zoetrope.providers import ProviderHub
+    hub = ProviderHub(config=None)
+    # jellyfin_config() may find the user's real config; force-disable:
+    hub._jf_config = None
+    assert hub.enabled is False
+    hub.refresh_home(lambda d: (_ for _ in ()).throw(AssertionError))
