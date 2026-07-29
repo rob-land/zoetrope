@@ -173,6 +173,34 @@ Recipe (research-normative):
   close, move-to-slot) 20 dmm above the panel — chrome outside content
   (visionOS/Android XR convention).
 
+## 8b. What is spatial-native vs 2D grammar (the element split)
+
+The stage is spatial; the content grammar is 2D everywhere. This is the
+formal boundary that keeps zoetrope cohesive with couch/hearth:
+
+**Spatial-native (exists only in XR; owned by the shell):** the
+cylinder/layer stage; world-anchoring, layout presets, follow modes,
+recenter; compositor-drawn focus ring and reticle-at-depth; gaze
+gravity; the theater screen with feathered stereo edges; Exposé; the
+head-locked-lite ambient strip; floating ornaments and window pills
+(chrome outside content); environment/void; spatial audio cues; dwell +
+verb palette.
+
+**2D grammar (identical inside a zoetrope panel and on a couch/hearth
+screen):** rails, card lockups, the resume row, overlay-control-center
+anatomy, transport controls, settings/preferences pages, text,
+keyboards, setup flows. A zoetrope panel should render *the same rails
+couch renders* — same tokens, same focus behavior — placed on the stage
+by the spatial layer. Never fake 3D inside panel content (no depth on
+text, no extruded UI); depth expresses hierarchy *between* surfaces
+only.
+
+**Doesn't survive the trip to spatial:** hover-dependent UI, dense grids
+as primary browsing, scrollbars (flings + focus memory instead), modal
+chains, tiny toolbars. **Transfers both ways:** parallax tilt on the
+focused card (thumb micro-motion on tvOS ≡ sub-threshold head motion
+here).
+
 ## 9. Implementation order (maps to current code)
 
 1. Palette/type/focus pass in `apps/base.py` + `shell.py` (tokens from

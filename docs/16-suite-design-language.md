@@ -140,6 +140,94 @@ hearth silent by default (shared-space device).
    shell has a one-action "recenter/reset view" concept (zoetrope:
    recenter; couch: Home; hearth: tap-anywhere-from-ambient).
 
+## hearth: migration to GTK4 (decided 2026-07-28)
+
+hearth moves from the Vue/Chromium kiosk to a **second personality of the
+couch shell** (Steam Big Picture vs Steam Deck model — one UI, two
+postures). Rationale: couch already has the expensive parts (profiles,
+providers, rails/tiles, libmpv, kiosk session, first-run setup); hearth's
+distinct parts are exactly the ambient layer this doc assigns it. A
+Chromium kiosk is also the heaviest possible runtime on a Pi 5; GTK4 on
+V3D is lighter and faster to boot, and Python end-to-end makes
+suite-tokens and suite-ui *literally shared code*.
+
+- `posture=ambient` defaults: boots to the ambient card deck; touch-first
+  input; proximity/pickup density switching; wakes into the same rails
+  couch shows on a TV.
+- **Keep the phone-browser setup wizard** (`hearth.local:8080`) — a great
+  appliance pattern independent of toolkit; it becomes a thin web
+  endpoint over the same settings store.
+- The Pi-image builder repo remains; it ships the GTK shell + cage
+  session instead of Chromium.
+
+## The provider model (backends as plugins)
+
+One shared abstraction, organized by **media kind**, extracted from
+couch's `MediaProvider` into a suite package (`suite_providers`,
+scaffolded in `~/projects/suite`):
+
+- **Video library**: Jellyfin (couch's implementation is the seed), Plex,
+  local files (= the ripsaw library — this is how zoetrope's rails and
+  couch's rails become the same data).
+- **Photo library**: **Immich** + local folders. Immich is zoetrope's
+  gallery backend — spatial photos synced from a phone, viewed in the
+  glasses. The photo model carries a `stereo` hint end-to-end.
+- **Audio/books**: Audiobookshelf / Subsonic. **Live**: IPTV.
+
+Obligations every provider implements: map resume state into **Watch
+Next semantics** (CONTINUE / NEXT / WATCHLIST / NEW + progress +
+recency) so the shared first rail aggregates across backends; honor
+kid-mode filtering at the provider interface, not in the UI; declare a
+**stereo-capability level** (below).
+
+### 3D media across backends — the reality (research 2026-07-28)
+
+The suite's differentiator is stereo content, and backends mostly don't
+model it. Provider interfaces therefore expose *how much the server
+knows* via `StereoCapability`:
+
+- `SERVER_TAGGED` — the server stores/serves a 3D format field the
+  client can query.
+- `NAME_INFERRED` — the server returns filenames/paths; the client
+  applies naming rules (Kodi-style `*.3D.*`, `HSBS`, `HTAB`, `MVC`
+  slugs; ripsaw's `.fsbs.mkv` family).
+- `PROBE_REQUIRED` — only downloading/probing the bytes can tell
+  (stereoscope `probe`, libmvc detection, MPO/HEIC parsing).
+
+Findings (2026-07-28 survey; A = server metadata query, B = filename
+via API + our naming rules, C = download/probe bytes):
+
+| Format | Jellyfin | Plex | Immich |
+|---|---|---|---|
+| MVC MKV | **A** (`Video3DFormat: MVC` — but only if the filename carries an `mvc` token; no container sniffing) | C (B via `Part.file`; server plays 2D base view; **never transcode**) | — |
+| FSBS / HSBS / TAB video | **A** (filename tokens; bare `sbs`/`tab` map to *Half*; one container case: Matroska StereoMode=1 → FullSBS) | C (B via `Part.file`) | — |
+| MV-HEVC | C (no enum value; scans as plain HEVC) | C | C |
+| MPO photo | — | — | **B** (`originalFileName` search) → C for frame 2 |
+| Spatial HEIC | — | — | **C only** (indistinguishable from 2D in the API) |
+| VR180 photo | — | — | A-partial (`projectionType=EQUIRECTANGULAR`, but stereo-vs-mono unknowable) → C |
+
+Key facts: Jellyfin's `Video3DFormat` is populated on **every** video
+DTO, filterable via `/Items?is3D=true`, and user-editable via the API —
+but it's filename-in/filename-out (Emby.Naming Format3DParser; Kodi-ish
+tokens). Plex has literally no 3D field anywhere and its scanner ignores
+3D tokens. Immich never modifies originals and serves them byte-exact
+(`/api/assets/{id}/original`) — which is what makes client-side MPO/HEIC
+stereo parsing viable at all; its own spatial-photo PRs died unmerged.
+No backend probes stereo structure inside files — **our clients carry
+the parsers** (stereoscope, libmvc, zoetrope's MPO splitter).
+
+Design consequences:
+1. The local-files provider is the gold standard (full probe access);
+   network providers degrade gracefully — the UI never promises 3D it
+   can't verify, and a client-side **probe cache** upgrades
+   `NAME_INFERRED` items to `PROBED` after first play.
+2. **ripsaw action item**: name outputs to satisfy both Kodi and
+   Jellyfin rule sets (e.g. `Title (Year) 3D.HSBS.mkv` — ripsaw's
+   current `.fsbs.mkv` suffix is Jellyfin-parseable but not Kodi's
+   `3d`-token rule) *and* set Matroska `StereoMode` on FSBS outputs so
+   Jellyfin's one container-level detection fires.
+3. On Plex, stereo items are direct-play/download only.
+
 ## Shared services (beyond pixels — the deeper cohesion)
 
 - **Library**: ripsaw's `library_root` + Jellyfin naming is the common
