@@ -44,7 +44,7 @@ void main() {
     // rounded silhouette instead of drawing a square frame over the corners.
     vec2 d = min(v_uv, 1.0 - v_uv);
     float edge = 1.0 - smoothstep(border * 0.6, border * 1.6, min(d.x, d.y));
-    vec3 accent = vec3(0.20, 0.85, 0.95);
+    vec3 accent = vec3(0.208, 0.518, 0.894);   // suite token color.accent #3584e4
     frag = mix(c, vec4(accent, c.a), edge * selected * 0.9 * c.a);
 }
 """

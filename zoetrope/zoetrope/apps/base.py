@@ -1,4 +1,11 @@
-"""App base classes + texture helpers (PIL/moderngl imported lazily)."""
+"""App base classes + texture helpers (PIL/moderngl imported lazily).
+
+Colors follow the suite "Adwaita-through-glass" tokens (see
+beampro/docs/16-suite-design-language.md and zoetrope/tokens.py):
+translucent white glass fills + strokes on the additive display (black
+is transparent there), white text, Adwaita blue accent (drawn by the
+renderer's focus border).
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -80,11 +87,12 @@ def _card_base(w: int, h: int, thumb=None):
     inset, radius = 8, 28
     card = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     cd = ImageDraw.Draw(card)
-    top, bottom = (30, 40, 52), (13, 18, 26)
+    # Glass fill: white ~16% at the top easing to ~9% (token glass-fill
+    # is 12%; the gradient centers there and adds a top-lit read).
     for yy in range(h):
         t = yy / max(1, h - 1)
-        col = tuple(int(a + (b - a) * t) for a, b in zip(top, bottom))
-        cd.line([(0, yy), (w, yy)], fill=col + (242,))
+        a = int(41 - 18 * t)
+        cd.line([(0, yy), (w, yy)], fill=(255, 255, 255, a))
     if thumb is not None:
         tw, th = thumb.size
         scale = max(w / tw, h / th)                      # cover-crop
@@ -104,7 +112,7 @@ def _card_base(w: int, h: int, thumb=None):
     img.paste(card, (0, 0), mask)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([inset, inset, w - inset, h - inset], radius=radius,
-                        outline=(70, 140, 160, 200), width=2)
+                        outline=(255, 255, 255, 89), width=2)
     return img, d
 
 
@@ -115,16 +123,16 @@ def make_tile(ctx, title: str, subtitle: str = "", w: int = 512, h: int = 320,
     try:
         from PIL import Image, ImageDraw  # noqa: F401
     except ImportError:
-        return _solid_texture(ctx, (24, 36, 48, 235), (w, h))
+        return _solid_texture(ctx, (255, 255, 255, 31), (w, h))
     img, d = _card_base(w, h, thumb=thumb)
     if icon and thumb is None:
-        _draw_icon(d, icon, 40, 40, 64, (140, 200, 215, 255))
+        _draw_icon(d, icon, 40, 40, 64, (255, 255, 255, 220))
     font = _load_font(44)
     sub_font = _load_font(22)
-    d.text((36, h - 110), title, font=font, fill=(238, 246, 250, 255))
+    d.text((36, h - 110), title, font=font, fill=(255, 255, 255, 255))
     if subtitle:
         d.text((36, h - 54), _ellipsize(d, subtitle, sub_font, w - 72),
-               font=sub_font, fill=(165, 205, 220, 255))
+               font=sub_font, fill=(255, 255, 255, 178))
     return pil_to_texture(ctx, img)
 
 
@@ -140,9 +148,9 @@ def clock_image(w: int = 640, h: int = 180, when=None):
     hhmm = _time.strftime("%H:%M", t)
     date = _time.strftime("%a %d %b", t)
     tw = d.textlength(hhmm, font=big)
-    d.text(((w - tw) / 2, 8), hhmm, font=big, fill=(225, 240, 248, 230))
+    d.text(((w - tw) / 2, 8), hhmm, font=big, fill=(255, 255, 255, 230))
     dw = d.textlength(date, font=small)
-    d.text(((w - dw) / 2, 124), date, font=small, fill=(140, 185, 205, 200))
+    d.text(((w - dw) / 2, 124), date, font=small, fill=(255, 255, 255, 165))
     return img
 
 
@@ -152,10 +160,12 @@ def message_texture(ctx, lines: list[str], w: int = 1280, h: int = 720):
     try:
         from PIL import Image, ImageDraw
     except ImportError:
-        return _solid_texture(ctx, (30, 40, 55, 255), (w, h))
+        return _solid_texture(ctx, (255, 255, 255, 31), (w, h))
     import textwrap
-    img = Image.new("RGBA", (w, h), (10, 14, 20, 255))
+    img = Image.new("RGBA", (w, h), (255, 255, 255, 31))
     d = ImageDraw.Draw(img)
+    d.rounded_rectangle([4, 4, w - 4, h - 4], radius=24,
+                        outline=(255, 255, 255, 89), width=2)
     margin = 60
     for size in (40, 32, 26, 20):
         font = _load_font(size)
@@ -169,7 +179,7 @@ def message_texture(ctx, lines: list[str], w: int = 1280, h: int = 720):
             break
     y = max(margin, h // 2 - len(wrapped) * line_h // 2)
     for ln in wrapped:
-        d.text((margin, y), ln, font=font, fill=(220, 230, 240, 255))
+        d.text((margin, y), ln, font=font, fill=(255, 255, 255, 255))
         y += line_h
     return pil_to_texture(ctx, img)
 

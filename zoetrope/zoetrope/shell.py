@@ -239,8 +239,10 @@ class Shell:
             return None
         self._clock_tex = pil_to_texture(self.ctx, img)
         self._clock_minute = time.localtime().tm_min
+        # Bottom ambient strip: up-gaze is fatiguing (doc 17 §0), so
+        # ambient chrome lives below the rails, glanceable on look-down.
         return Panel(id="_clock", title="clock", yaw_deg=0.0,
-                     width_m=0.66, height_m=0.19, y_m=0.40,
+                     width_m=0.52, height_m=0.15, y_m=-0.46,
                      texture=self._clock_tex, stereo_mode="mono")
 
     def _update_clock(self) -> None:
