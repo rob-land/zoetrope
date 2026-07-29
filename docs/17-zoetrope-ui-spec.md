@@ -173,6 +173,56 @@ Recipe (research-normative):
   close, move-to-slot) 20 dmm above the panel — chrome outside content
   (visionOS/Android XR convention).
 
+## 8a. The Movies app at library scale (designed 2026-07-29)
+
+The current pages are walking-skeleton wiring (home rail of 8, an
+"All Movies" page capped at 24 on one rail). The arithmetic that kills
+linear browsing: ~14°/poster × ±40° comfort cone = 5–6 visible cards,
+so a 300-title rail is ~50 window-steps. The scalable structure:
+
+**Home never shows the library.** Home's media band is the **resume
+rail** (Watch Next semantics — CONTINUE/NEXT/WATCHLIST/NEW, already
+implemented in `suite_providers`' Jellyfin backend) plus optionally
+"Recently added". Most sessions are "keep watching"; library size is
+irrelevant on home.
+
+**Opening Movies → a browse page of stacked rails** (the leanback
+grammar the rails machinery already renders; shared with couch):
+
+1. **Rail group per backend library** when several exist — Jellyfin
+   "views" / Plex sections (Movies, Kids, Anime, …). Kid-mode profiles
+   filter which libraries exist at all (provider obligation).
+2. Within a library: **genre rails** (Jellyfin serves genres and
+   filters server-side — one query per rail, fetched lazily as the
+   gaze approaches), plus **Recently Added** and **Unwatched**.
+   ~15 genre rails × ~20 titles turns 50 steps into "look down three
+   rails, step twice."
+3. **A-Z scrub rail**: a compact rail of letter tiles; activating a
+   letter jumps the adjacent movie rail's window to that initial (the
+   Kodi/Plex TV pattern; degrades perfectly to gaze+buttons since the
+   alphabet is just another rail). Cheaper sibling shipped first:
+   **long-press prev/next jumps by initial letter** (Android TV
+   fast-scroll convention).
+4. The dense **grid stays as "view all"** — wrong for primary browsing
+   (research), fine for deliberate view-everything; row/col navigation
+   already handles 2D.
+
+**Search tiering** (glasses can't type): scoped browsing above beats
+search below ~1k titles; the phone web-remote's keyboard covers rare
+lookups today; voice is the eventual answer.
+
+**Stereo at scale**: rails badge 3D titles from the provider's
+`StereoHint`; a "3D" rail (server-filterable on Jellyfin via
+`/Items?is3D=true`) sits with the genre rails. `NAME`-confidence hints
+upgrade to `PROBED` lazily via the probe cache after first play.
+
+**Paradigm note**: this structure is independent of the open
+home-paradigm question (icon launcher vs media rails — see
+[[feedback-zoetrope-ui-paradigm]]): if home becomes an icon launcher,
+Movies is an icon and everything above is what the app opens into; the
+media grammar lives inside the app, and non-media apps (terminal) stop
+living in a media paradigm.
+
 ## 8b. What is spatial-native vs 2D grammar (the element split)
 
 The stage is spatial; the content grammar is 2D everywhere. This is the
