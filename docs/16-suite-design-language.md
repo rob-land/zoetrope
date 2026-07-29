@@ -162,9 +162,15 @@ suite-tokens and suite-ui *literally shared code*.
 
 ## The provider model (backends as plugins)
 
-One shared abstraction, organized by **media kind**, extracted from
-couch's `MediaProvider` into a suite package (`suite_providers`,
-scaffolded in `~/projects/suite`):
+One shared abstraction in `suite_providers` (github.com/rob-land/suite).
+**As of 2026-07-29 this is couch's full async provider layer, moved**:
+`suite_providers.media` (MediaItem/StreamInfo/ratings + kid-mode
+ordering) and `suite_providers.aio` (MediaProvider interface + the
+complete Jellyfin implementation — Quick Connect auth, listings,
+search, episodes, matching, playback, progress). couch imports it via
+thin facades; zoetrope drives the same stack for its rails. StreamInfo
+carries a stereo hint: 3D-configured players (zoetrope) act on it, 2D
+players ignore it. Organized by **media kind**:
 
 - **Video library**: Jellyfin (couch's implementation is the seed), Plex,
   local files (= the ripsaw library — this is how zoetrope's rails and
