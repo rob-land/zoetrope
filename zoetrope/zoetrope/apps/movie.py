@@ -43,6 +43,10 @@ class MovieApp(App):
     id = "movie"
     title = "3D Movie"
     handles_nav = True           # prev/next seek instead of resizing
+    # Open the screen well back from the launcher plane — at 1.7 m the
+    # cinema canvas reads as in-your-face on the fixed-focus optics
+    # (hardware feedback: "way too close, several steps back").
+    preferred_dist = 2.7
 
     def __init__(self, ctx, path: str, get_proc_address, stereo_mode: str = "sbs",
                  fbo_size=(1920, 1080), probe: dict | None = None):

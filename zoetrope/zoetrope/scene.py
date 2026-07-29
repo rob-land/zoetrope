@@ -34,6 +34,12 @@ class CylinderLayout:
     radius_m: float = 1.8
     arc_span_deg: float = 90.0     # max total horizontal spread of the launcher row
     step_deg: float = 22.0         # preferred spacing between tiles
+    #: rail ends bend *toward* the viewer: radius shrinks quadratically
+    #: with azimuth, up to this much at 45 deg. On the fixed-focus
+    #: optics a true constant-radius arc reads as "ends curving away";
+    #: pulling the ends in makes the rail feel equidistant as the head
+    #: turns (hardware feedback 2026-07-29).
+    end_pull_m: float = 0.25
 
     def yaw_for_index(self, index: int, count: int) -> float:
         """Symmetric, centered layout. Uses `step_deg` spacing but never exceeds
@@ -46,7 +52,8 @@ class CylinderLayout:
 
     def position(self, panel: Panel) -> Vec3:
         a = math.radians(panel.yaw_deg)
-        r = self.radius_m + panel.radius_bias
+        pull = self.end_pull_m * min(1.0, (abs(panel.yaw_deg) / 45.0) ** 2)
+        r = self.radius_m + panel.radius_bias - pull
         return (r * math.sin(a), panel.y_m, -r * math.cos(a))
 
     def model_matrix(self, panel: Panel) -> Mat4:

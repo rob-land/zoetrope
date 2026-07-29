@@ -634,3 +634,22 @@ class TestRails(unittest.TestCase):
         sc_.move_row(+1)
         sc_.move_selection(+1)
         self.assertEqual(sc_.selected, 4)   # 3 in row 0 + col 1
+
+
+class TestRailShape(unittest.TestCase):
+    def test_rail_ends_pull_toward_viewer(self):
+        import math as _math
+        lay = scene.CylinderLayout(radius_m=1.9, end_pull_m=0.25)
+        center = scene.Panel(id="c", title="", yaw_deg=0.0)
+        edge = scene.Panel(id="e", title="", yaw_deg=45.0)
+        dc = _math.hypot(*[v for i, v in enumerate(lay.position(center)) if i != 1])
+        de = _math.hypot(*[v for i, v in enumerate(lay.position(edge)) if i != 1])
+        self.assertTrue(approx(dc, 1.9))
+        self.assertTrue(approx(de, 1.65))   # full pull at 45 deg
+
+    def test_movie_opens_well_back(self):
+        from zoetrope.apps.movie import MovieApp
+        from zoetrope.shell import APP_DIST_RANGE
+        assert MovieApp.preferred_dist == 2.7
+        lo, hi = APP_DIST_RANGE
+        assert lo <= MovieApp.preferred_dist <= hi

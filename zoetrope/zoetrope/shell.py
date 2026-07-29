@@ -349,6 +349,12 @@ class Shell:
         if app is not None:
             self.current = app
             self.mode = APP
+            # Fresh window geometry per app; apps may prefer a distance
+            # (movies open well back).
+            self._app_scale = 1.0
+            self._app_dist = _clamp(
+                getattr(app, "preferred_dist", None) or APP_DIST_DEFAULT,
+                APP_DIST_RANGE)
 
     def on_back(self):
         if self.mode == APP and self.current is not None:
