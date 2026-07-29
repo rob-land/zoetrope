@@ -22,6 +22,7 @@ class Panel:
     width_m: float = 0.9           # physical size in meters at the cylinder surface
     height_m: float = 0.55
     y_m: float = 0.0               # vertical offset
+    radius_bias: float = 0.0       # small per-row radius offset (kills z-fighting)
     texture: object | None = None  # renderer-specific handle (moderngl.Texture)
     stereo_mode: str = "mono"      # "mono" | "sbs" (texture already L|R) | "pair"
     texture_right: object | None = None  # for "pair": right-eye texture
@@ -45,7 +46,8 @@ class CylinderLayout:
 
     def position(self, panel: Panel) -> Vec3:
         a = math.radians(panel.yaw_deg)
-        return (self.radius_m * math.sin(a), panel.y_m, -self.radius_m * math.cos(a))
+        r = self.radius_m + panel.radius_bias
+        return (r * math.sin(a), panel.y_m, -r * math.cos(a))
 
     def model_matrix(self, panel: Panel) -> Mat4:
         """Panel transform: translate onto the cylinder, yaw to face the center."""
@@ -67,11 +69,16 @@ class LauncherScene:
     comfort cone. ``set_panels`` remains as the single-row shorthand.
     """
 
+    #: a row must beat the current one by this much head pitch to steal
+    #: focus (stops rail flapping at the boundary)
+    ROW_HYSTERESIS_DEG = 2.0
+
     def __init__(self, layout: CylinderLayout | None = None):
         self.layout = layout or CylinderLayout()
         self.rows: list[list[Panel]] = []
         self.row: int = 0
         self._col: dict[int, int] = {}   # per-row focus memory
+        self._off: dict[int, int] = {}   # per-row scroll-window offset
 
     # -- content -------------------------------------------------------------
 
@@ -96,19 +103,34 @@ class LauncherScene:
         for i, row in enumerate(self.rows):
             self._relayout_row(i, row)
 
+    def _row_step(self, row: list[Panel]) -> float:
+        """Per-row tile spacing: narrow cards (posters) pack tighter.
+        Angular card width + ~3.5 deg gap, capped at the layout step."""
+        width = max(p.width_m for p in row)
+        return min(self.layout.step_deg,
+                   math.degrees(width / self.layout.radius_m) + 3.5)
+
     def _relayout_row(self, i: int, row: list[Panel]) -> None:
         n = len(row)
-        span = self.layout.step_deg * (n - 1)
-        if span <= self.layout.arc_span_deg:
+        step = self._row_step(row)
+        if step * (n - 1) <= self.layout.arc_span_deg:
+            step = min(step, self.layout.step_deg)
             for j, p in enumerate(row):
-                p.yaw_deg = self.layout.yaw_for_index(j, n)
-        else:
-            # Leanback scroll: center the focused column; neighbours
-            # step outward, clamped by nothing (off-arc cards are simply
-            # behind the viewer until scrolled to).
-            sel = self._col.get(i, 0)
-            for j, p in enumerate(row):
-                p.yaw_deg = self.layout.step_deg * (j - sel)
+                p.yaw_deg = -step * (n - 1) / 2.0 + step * j
+            self._off[i] = 0
+            return
+        # Windowed leanback scroll: the window shifts only when the
+        # selection walks past its edge (never on gaze — see
+        # select_by_yaw), so cards don't stream past a stationary head.
+        half = self.layout.arc_span_deg / 2.0
+        w = max(1, int(half / step))
+        sel = self._col.get(i, 0)
+        off = self._off.get(i, w)
+        off = min(max(off, sel - w), sel + w)      # keep sel inside window
+        off = min(max(off, w), n - 1 - w)          # pin rail ends
+        self._off[i] = off
+        for j, p in enumerate(row):
+            p.yaw_deg = step * (j - off)
 
     # -- selection -----------------------------------------------------------
 
@@ -145,17 +167,26 @@ class LauncherScene:
         return self.row
 
     def select_by_yaw(self, yaw_deg: float) -> int:
-        """Select the current row's panel nearest `yaw_deg` (pointer)."""
+        """Select the current row's *visible* panel nearest `yaw_deg`.
+
+        Gaze/pointer never scrolls the rail (that caused a feedback
+        loop: recentering moved a different card under the stationary
+        gaze). Off-arc cards are reached with prev/next, which shifts
+        the window deterministically."""
         if not self.rows:
             return -1
         row = self.rows[self.row]
-        best_j, best_d = 0, float("inf")
+        half = self.layout.arc_span_deg / 2.0
+        best_j, best_d = None, float("inf")
         for j, p in enumerate(row):
+            if abs(p.yaw_deg) > half:
+                continue
             d = abs(_wrap180(yaw_deg - p.yaw_deg))
             if d < best_d:
                 best_j, best_d = j, d
+        if best_j is None:
+            return self._col.get(self.row, 0)
         self._col[self.row] = best_j
-        self._relayout_row(self.row, row)
         return best_j
 
     def select_by_gaze(self, pose: HeadPose) -> int:
@@ -164,13 +195,18 @@ class LauncherScene:
         if not self.rows:
             return -1
         pitch = math.degrees(head_pitch(pose))
-        best_i, best_d = self.row, float("inf")
-        for i, row in enumerate(self.rows):
+
+        def row_dist(i: int) -> float:
             row_pitch = math.degrees(
-                math.atan2(row[0].y_m, self.layout.radius_m))
-            d = abs(pitch - row_pitch)
-            if d < best_d:
-                best_i, best_d = i, d
+                math.atan2(self.rows[i][0].y_m, self.layout.radius_m))
+            return abs(pitch - row_pitch)
+
+        best_i = min(range(len(self.rows)), key=row_dist)
+        # Hysteresis: the new row must clearly win, or the current stays.
+        if (best_i != self.row
+                and row_dist(self.row) - row_dist(best_i)
+                < self.ROW_HYSTERESIS_DEG):
+            best_i = self.row
         self.row = best_i
         return self.select_by_yaw(math.degrees(head_yaw(pose)))
 

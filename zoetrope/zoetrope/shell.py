@@ -242,22 +242,28 @@ class Shell:
             print("[shell] terminal needs pyte:  pip install -e '.[term]'")
             return None
 
-    # Vertical rail offsets on the cylinder (meters at the arc).
-    ROW_Y = (0.26, -0.22)
+    # Vertical rail centers (meters at the arc). Sized so the rails and
+    # the clock strip never overlap: posters [0.05..0.59], apps
+    # [-0.44..-0.04], clock [-0.67..-0.53].
+    ROW_Y = (0.32, -0.24)
 
     def _install_tiles(self) -> None:
         rows = []
         for i, tiles in enumerate(self._rows):
-            y = self.ROW_Y[i] if i < len(self.ROW_Y) else -0.22 - 0.45 * (i - 1)
+            y = self.ROW_Y[i] if i < len(self.ROW_Y) else -0.24 - 0.46 * (i - 1)
             panels = []
             for t in tiles:
                 if t.poster:
-                    w_m, h_m, tw, th = 0.42, 0.63, 340, 510
+                    w_m, h_m, tw, th = 0.36, 0.54, 340, 510
                 else:
                     w_m, h_m, tw, th = 0.62, 0.40, 512, 320
                 panels.append(Panel(
                     id=t.id, title=t.title, yaw_deg=0.0,
                     width_m=w_m, height_m=h_m, y_m=y,
+                    # Each row sits a hair nearer than the one above so
+                    # any residual overlap depth-tests instead of
+                    # z-fighting (co-planar quads flicker).
+                    radius_bias=-0.02 * i,
                     texture=make_tile(self.ctx, t.title, t.subtitle,
                                       w=tw, h=th, icon=t.icon, thumb=t.thumb),
                     stereo_mode="mono",
@@ -275,7 +281,8 @@ class Shell:
         # Bottom ambient strip: up-gaze is fatiguing (doc 17 §0), so
         # ambient chrome lives below the rails, glanceable on look-down.
         return Panel(id="_clock", title="clock", yaw_deg=0.0,
-                     width_m=0.52, height_m=0.15, y_m=-0.46,
+                     width_m=0.48, height_m=0.14, y_m=-0.60,
+                     radius_bias=-0.05,
                      texture=self._clock_tex, stereo_mode="mono")
 
     def _update_clock(self) -> None:

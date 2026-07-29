@@ -581,14 +581,32 @@ class TestRails(unittest.TestCase):
         sc_.set_rows(rows)
         return sc_
 
-    def test_long_row_recenters_on_focus(self):
+    def test_long_row_scrolls_by_window_not_recenter(self):
         sc_ = self._scene([8, 3])
-        # 8 * 20deg exceeds the 80deg span -> leanback scroll: selected
-        # column sits at yaw 0.
-        sc_.move_selection(+3)
-        self.assertTrue(approx(sc_.selected_panel.yaw_deg, 0.0))
-        # Neighbour steps outward by step_deg.
-        self.assertTrue(approx(sc_.rows[0][4].yaw_deg, 20.0))
+        step = sc_._row_step(sc_.rows[0])
+        half = sc_.layout.arc_span_deg / 2.0
+        w = max(1, int(half / step))
+        # Selection inside the window: cards don't move.
+        before = [p.yaw_deg for p in sc_.rows[0]]
+        sc_.move_selection(+1)
+        if 1 <= sc_._off[0] + w:
+            self.assertEqual([p.yaw_deg for p in sc_.rows[0]], before)
+        # Walking to the end shifts the window but keeps the selection
+        # inside the visible arc.
+        for _ in range(10):
+            sc_.move_selection(+1)
+        self.assertLessEqual(abs(sc_.selected_panel.yaw_deg), half)
+
+    def test_gaze_never_scrolls_the_rail(self):
+        # Regression: gaze re-centering moved cards under a stationary
+        # head, streaming thumbnails past "randomly".
+        sc_ = self._scene([8, 3])
+        yaws_before = [p.yaw_deg for p in sc_.rows[0]]
+        edge = sc_.layout.arc_span_deg / 2.0 - 1.0
+        sc_.select_by_yaw(edge)
+        self.assertEqual([p.yaw_deg for p in sc_.rows[0]], yaws_before)
+        # And gaze only picks visible cards.
+        self.assertLessEqual(abs(sc_.selected_panel.yaw_deg), edge + 1.0)
 
     def test_per_row_focus_memory(self):
         sc_ = self._scene([5, 3])
