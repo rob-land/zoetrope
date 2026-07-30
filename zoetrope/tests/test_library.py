@@ -259,3 +259,30 @@ def test_quick_connect_state_machine(tmp_path, monkeypatch):
     assert events[0]["code"] == "123456"
     assert hub.enabled and hub._jf_config["user_id"] == "u9"
     assert pr.jellyfin_config(str(tmp_path / "config.json"))["access_token"] == "tok"
+
+
+def test_hub_discovery_surfaces_server(monkeypatch, tmp_path):
+    import asyncio
+    import time
+
+    pytest.importorskip("suite_providers")
+    import suite_providers.aio.jellyfin as jf
+    from suite_providers.aio.jellyfin.discovery import DiscoveredServer
+    from zoetrope import providers as pr
+
+    async def fake_discover(timeout=2.5, **kw):
+        return [DiscoveredServer(name="Den", url="http://10.0.0.5:8096")]
+
+    monkeypatch.setattr(jf, "discover", fake_discover)
+    monkeypatch.setattr(pr, "config_path",
+                        lambda: str(tmp_path / "none.json"))
+    hub = pr.ProviderHub(config=None)
+    assert not hub.has_server
+    events = []
+    hub.start_discovery(events.append)
+    deadline = time.time() + 3
+    while not events and time.time() < deadline:
+        time.sleep(0.05)
+    assert hub.has_server
+    assert hub._server == "http://10.0.0.5:8096"
+    assert hub.server_name == "Den"

@@ -181,6 +181,10 @@ class Shell:
         self._net_kicked = hub is not None and hub.enabled
         if self._net_kicked:
             hub.refresh_home(self._pending_rails.put)
+        elif hub is not None and not hub.has_server:
+            # Nothing configured: try Jellyfin UDP discovery; a find
+            # surfaces the Connect tile via a rails rebuild.
+            hub.start_discovery(self._pending_rails.put)
         self._rows = self._build_home_rows()
         self._tiles = [t for r in self._rows for t in r]
         self._install_tiles()
@@ -231,7 +235,8 @@ class Shell:
                 and not self.hub.enabled):
             from .apps.connect import QuickConnectApp
             app_rail.append(Tile(
-                "jellyfin-connect", "Connect Jellyfin", "Quick Connect",
+                "jellyfin-connect", "Connect Jellyfin",
+                self.hub.server_name or "Quick Connect",
                 lambda: QuickConnectApp(self.ctx, self.hub), icon="movie"))
         return [r for r in (movie_rail, app_rail) if r]
 

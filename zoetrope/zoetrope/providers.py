@@ -140,6 +140,34 @@ class ProviderHub:
     def has_server(self) -> bool:
         return bool(self._server)
 
+    @property
+    def server_name(self) -> str | None:
+        return getattr(self, "_server_name", None)
+
+    def start_discovery(self, deliver) -> None:
+        """No config at all? Find the server ourselves (Jellyfin UDP
+        broadcast via the shared suite implementation). On a find the
+        hub gains a server (Connect tile appears); ``deliver({})``
+        nudges the shell to rebuild its rails."""
+        if self.enabled or self._server:
+            return
+        if self._loop is None:
+            self._loop = asyncio.new_event_loop()
+            threading.Thread(target=self._loop.run_forever,
+                             name="zoetrope-providers", daemon=True).start()
+        asyncio.run_coroutine_threadsafe(self._discover(deliver), self._loop)
+
+    async def _discover(self, deliver) -> None:
+        try:
+            from suite_providers.aio.jellyfin import discover
+            servers = await discover(timeout=2.5)
+        except Exception:
+            return
+        if servers and not self._server:
+            self._server = servers[0].url
+            self._server_name = servers[0].name
+            deliver({})
+
     def quick_connect(self, deliver) -> None:
         """Pair with Jellyfin via Quick Connect (no typing in-glasses).
 
