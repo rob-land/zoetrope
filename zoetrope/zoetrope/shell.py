@@ -37,6 +37,9 @@ APP_DIST_STEP = 0.25
 APP_DIST_RANGE = (0.9, 4.0)
 APP_DIST_DEFAULT = 1.7
 
+# Whole-slab push/pull (PgUp/PgDn or -/=): launcher cylinder radius.
+SLAB_DIST_DEFAULT = 1.9
+
 
 def _panel_scale(width_m: float, height_m: float):
     mat = m.mat4_identity()
@@ -181,14 +184,18 @@ class Shell:
     MOVIE_PAGE_LIMIT = 24
 
     def __init__(self, ctx, media_dir: str, get_proc_address,
-                 library_dir: str | None = None, hub=None):
+                 library_dir: str | None = None, hub=None,
+                 radius_m: float | None = None):
         self.ctx = ctx
         self.media_dir = media_dir
         self.get_proc_address = get_proc_address
         self.library_roots = library.library_roots(media_dir, library_dir)
         self.mode = LAUNCHER
         self.current: App | None = None
-        self.scene = LauncherScene(CylinderLayout(radius_m=1.9, arc_span_deg=80.0))
+        self.scene = LauncherScene(CylinderLayout(
+            radius_m=_clamp(radius_m or SLAB_DIST_DEFAULT,
+                            self.SLAB_DIST_RANGE),
+            arc_span_deg=80.0))
         self._nav_this_frame = False
         self._gaze_lock_yaw: float | None = None
         self._app_scale = 1.0                    # focused-window user zoom
@@ -225,6 +232,9 @@ class Shell:
     #: rows get a snug slab) but never exceeds what the ±40° scroll
     #: window plus the widest card can reach.
     SLAB_HALF_ARC_RANGE = (26.0, 52.0)
+    #: whole-slab distance (cylinder radius) push/pull step and clamp
+    SLAB_DIST_STEP = 0.15
+    SLAB_DIST_RANGE = (1.3, 3.2)
 
     def _build_home_rows(self) -> list[tuple[str, list[Tile]]]:
         photos = library.scan_photos(self.library_roots)
@@ -381,7 +391,7 @@ class Shell:
 
     def _layout_chrome(self) -> None:
         """Geometry-only pass: slab arc, heading/clock placement, slab
-        extent. Cheap (no texture work)."""
+        extent. Cheap (no texture work), so radius changes reuse it."""
         heights = [0.54 if any(t.poster for t in tiles) else 0.40
                    for _, tiles in self._rows]
         rhythm, bar_y = rail_rhythm(heights)
@@ -415,6 +425,13 @@ class Shell:
         self._slab = (half_arc, bar_y - BAR_H_M / 2.0 - 0.10,
                       SLAB_Y_TOP + 0.05)
         self._backdrop_rev += 1
+
+    def set_radius(self, radius_m: float) -> None:
+        """Move the whole slab nearer/farther (PgDn/PgUp): re-derive the
+        rail layout and chrome at the new radius; textures are reused."""
+        self.scene.layout.radius_m = _clamp(radius_m, self.SLAB_DIST_RANGE)
+        self.scene._relayout()
+        self._layout_chrome()
 
     def backdrop(self) -> tuple | None:
         """The dashboard slab for the renderer: ``(rev, vertices,
@@ -486,6 +503,21 @@ class Shell:
         if self.mode == LAUNCHER:
             self.scene.move_row(+1)
             self._nav_this_frame = True
+        elif self.mode == APP:
+            self._app_dist = _clamp(self._app_dist - APP_DIST_STEP, APP_DIST_RANGE)
+
+    def on_push(self):
+        """PgUp / '-': launcher — push the whole slab farther away;
+        app — same as up (push the window)."""
+        if self.mode == LAUNCHER:
+            self.set_radius(self.scene.layout.radius_m + self.SLAB_DIST_STEP)
+        elif self.mode == APP:
+            self._app_dist = _clamp(self._app_dist + APP_DIST_STEP, APP_DIST_RANGE)
+
+    def on_pull(self):
+        """PgDn / '=': launcher — pull the slab closer; app — pull the window."""
+        if self.mode == LAUNCHER:
+            self.set_radius(self.scene.layout.radius_m - self.SLAB_DIST_STEP)
         elif self.mode == APP:
             self._app_dist = _clamp(self._app_dist - APP_DIST_STEP, APP_DIST_RANGE)
 

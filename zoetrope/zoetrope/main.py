@@ -44,7 +44,8 @@ def cmd_info(args) -> int:
 
 def cmd_run(args) -> int:
     from .window import (Window, WindowConfig, EV_QUIT, EV_RECENTER,
-                         EV_PREV, EV_NEXT, EV_UP, EV_DOWN, EV_ACTIVATE, EV_BACK)
+                         EV_PREV, EV_NEXT, EV_UP, EV_DOWN, EV_PUSH, EV_PULL,
+                         EV_ACTIVATE, EV_BACK)
     from .renderer import StereoRenderer
     from .shell import Shell
     from . import tracking
@@ -93,7 +94,8 @@ def cmd_run(args) -> int:
         args.tracker, vid=usb.vid if usb else None, sway=args.sway)
     from .providers import ProviderHub
     shell = Shell(ctx, args.media, win.get_proc_address,
-                  library_dir=args.library, hub=ProviderHub())
+                  library_dir=args.library, hub=ProviderHub(),
+                  radius_m=args.radius)
     from .controller import open_controller
     controller = open_controller(args.controller)
     remote = None
@@ -105,6 +107,7 @@ def cmd_run(args) -> int:
     print(f"[run] mode={mode} profile={profile.name} tracker={type(tracker).__name__}"
           f" controller={'daydream' if controller else 'none'}")
     print("      keys: arrows=select  enter=open  backspace=back  R=recenter  esc=quit")
+    print("      PgUp/PgDn (or -/=): push/pull the whole launcher slab")
     print("      in-app: left/right=smaller/bigger  up/down=push/pull")
     if controller:
         print("      daydream: point=select  click=open  app=back  home=recenter"
@@ -132,6 +135,10 @@ def cmd_run(args) -> int:
                     shell.on_farther()
                 elif ev == EV_DOWN:
                     shell.on_closer()
+                elif ev == EV_PUSH:
+                    shell.on_push()
+                elif ev == EV_PULL:
+                    shell.on_pull()
                 elif ev == EV_ACTIVATE:
                     shell.on_activate()
                 elif ev == EV_BACK:
@@ -251,6 +258,9 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--media", default=default_media)
     r.add_argument("--library", default=None,
                    help="movie library root (default: Ripsaw's library_root)")
+    r.add_argument("--radius", type=float, default=None, metavar="M",
+                   help="launcher slab distance in meters (default 1.9; "
+                        "PgUp/PgDn adjusts it live)")
     r.add_argument("--monitor", default=None, help="glasses monitor name (glasses mode)")
     r.add_argument("--sway", action="store_true", help="stub tracker head-sway (preview)")
     r.set_defaults(func=cmd_run)

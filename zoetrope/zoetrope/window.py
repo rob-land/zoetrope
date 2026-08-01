@@ -18,6 +18,8 @@ EV_PREV = "prev"
 EV_NEXT = "next"
 EV_UP = "up"          # app mode: push the window farther away
 EV_DOWN = "down"      # app mode: pull it closer
+EV_PUSH = "push"      # launcher: push the whole slab farther away
+EV_PULL = "pull"      # launcher: pull it closer
 EV_ACTIVATE = "activate"
 EV_BACK = "back"
 
@@ -120,6 +122,10 @@ class Window:
             glfw.KEY_ENTER: EV_ACTIVATE,
             glfw.KEY_SPACE: EV_ACTIVATE,
             glfw.KEY_BACKSPACE: EV_BACK,
+            glfw.KEY_PAGE_UP: EV_PUSH,
+            glfw.KEY_MINUS: EV_PUSH,
+            glfw.KEY_PAGE_DOWN: EV_PULL,
+            glfw.KEY_EQUAL: EV_PULL,
         }
         ev = mapping.get(key)
         if ev:

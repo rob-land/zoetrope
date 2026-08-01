@@ -88,6 +88,20 @@ class TestHeadlessRender(unittest.TestCase):
             renderer.render((w, h), shell.panels_models(), eyes,
                             shell.floor_model(), shell.selected_id(),
                             target=fbo, backdrop=shell.backdrop())
+            # Whole-slab push/pull: radius moves and clamps, the slab
+            # mesh re-uploads (new revision), and the frame still draws.
+            r0 = shell.scene.layout.radius_m
+            shell.on_push()
+            self.assertAlmostEqual(shell.scene.layout.radius_m,
+                                   r0 + shell.SLAB_DIST_STEP)
+            for _ in range(40):
+                shell.on_pull()
+            self.assertAlmostEqual(shell.scene.layout.radius_m,
+                                   shell.SLAB_DIST_RANGE[0])
+            self.assertIsNot(shell.backdrop(), backdrop)
+            renderer.render((w, h), shell.panels_models(), eyes,
+                            shell.floor_model(), shell.selected_id(),
+                            target=fbo, backdrop=shell.backdrop())
             shell.close()
         self.assertGreater(len(set(fbo.read(components=3))), 1)
 
