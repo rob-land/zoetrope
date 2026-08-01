@@ -148,9 +148,12 @@ class LauncherScene:
         for j, p in enumerate(row):
             p.yaw_deg = step * (j - off)
             # Off-window cards are unselectable (select_by_yaw skips
-            # them) — and undrawable: rendered, they poke past the slab
-            # and pile up near ±90° where sin() flattens their spacing.
-            p.data["offstage"] = abs(p.yaw_deg) > half
+            # them). The first one past each edge still draws — the
+            # renderer fades it at the slab rim (the "peek" that says
+            # this rail scrolls) — but beyond that they're offstage:
+            # rendered, they'd pile up near ±90° where sin() flattens
+            # their spacing.
+            p.data["offstage"] = abs(p.yaw_deg) > half + step
 
     # -- selection -----------------------------------------------------------
 

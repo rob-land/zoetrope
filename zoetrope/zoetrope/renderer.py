@@ -20,13 +20,16 @@ def _m4(mat) -> bytes:
 PANEL_VS = """
 #version 330
 uniform mat4 mvp;
+uniform mat4 model;
 uniform vec2 uv_offset;
 uniform vec2 uv_scale;
 in vec2 in_pos;
 in vec2 in_uv;
 out vec2 v_uv;
+out vec3 v_world;
 void main() {
     v_uv = uv_offset + in_uv * uv_scale;
+    v_world = (model * vec4(in_pos, 0.0, 1.0)).xyz;
     gl_Position = mvp * vec4(in_pos, 0.0, 1.0);
 }
 """
@@ -37,10 +40,18 @@ uniform sampler2D tex;
 uniform float selected;   // 1.0 if this panel is focused
 uniform float border;     // border half-width in uv units
 uniform float feather;    // edge fade half-width in uv units (0 = off)
+uniform float arc_limit;  // slab half-arc (deg); cards fade at the rim
+uniform float arc_fade;   // fade band width (deg)
 in vec2 v_uv;
+in vec3 v_world;
 out vec4 frag;
 void main() {
     vec4 c = texture(tex, v_uv);
+    // Clip at the slab's rim: a peeking card (one past the scroll
+    // window) fades out over the last few degrees instead of poking
+    // past the panel (doc 17 §2 wants the next card peeking ~25%).
+    float az = degrees(atan(v_world.x, -v_world.z));
+    c.a *= 1.0 - smoothstep(arc_limit - arc_fade, arc_limit, abs(az));
     // Feathered frame: soften the panel edges so stereo content doesn't
     // present a hard stereo-window violation (doc 17 §5).
     if (feather > 0.0) {
@@ -195,7 +206,7 @@ class StereoRenderer:
         True when there is a slab to draw."""
         if backdrop is None:
             return False
-        key, verts, size_m = backdrop
+        key, verts, size_m, _half_arc = backdrop
         if key != self._backdrop_key:
             if self._backdrop_vao is not None:
                 self._backdrop_vao.release()
@@ -226,6 +237,14 @@ class StereoRenderer:
         else:
             ctx.clear(0.02, 0.03, 0.05, 1.0)
         draw_backdrop = not void_theater and self._ensure_backdrop(backdrop)
+        if draw_backdrop:
+            # Cards clip against the slab rim (small inset keeps the
+            # fade inside the rounded corner).
+            self.panel_prog["arc_limit"].value = backdrop[3] - 0.5
+            self.panel_prog["arc_fade"].value = 2.5
+        else:
+            self.panel_prog["arc_limit"].value = 1000.0   # no slab: no clip
+            self.panel_prog["arc_fade"].value = 1.0
         for eye_index, eye in enumerate(eyes):
             ctx.viewport = eye.viewport.as_tuple()
             vp = _mul(eye.proj, eye.view)  # proj * view
@@ -247,6 +266,7 @@ class StereoRenderer:
                 tex.use(location=0)
                 self.panel_prog["tex"].value = 0
                 self.panel_prog["mvp"].write(_m4(_mul(vp, model)))
+                self.panel_prog["model"].write(_m4(model))
                 self.panel_prog["uv_offset"].value = uv_off
                 self.panel_prog["uv_scale"].value = uv_scale
                 self.panel_prog["selected"].value = 1.0 if panel.id == selected_id else 0.0

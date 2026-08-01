@@ -638,22 +638,24 @@ class TestRails(unittest.TestCase):
 
 class TestOffstageCulling(unittest.TestCase):
     def test_windowed_row_marks_offwindow_panels_offstage(self):
-        """Cards beyond the scroll window must be flagged: drawn, they
-        poke past the slab and pile up near ±90° (hardware feedback
-        2026-07-31)."""
+        """Cards beyond the scroll window plus one peeking card must be
+        flagged: drawn, they pile up near ±90° (hardware feedback
+        2026-07-31). One card past each edge stays drawable — the
+        renderer fades it at the slab rim as the scroll affordance."""
         sc_ = scene.LauncherScene(
             scene.CylinderLayout(step_deg=22.0, arc_span_deg=80.0))
         sc_.set_panels([scene.Panel(id=str(i), title="", yaw_deg=0.0)
                         for i in range(9)])
         on = [p for p in sc_.panels if not p.data.get("offstage")]
-        self.assertEqual(len(on), 3)               # window w=1: 3 visible
-        self.assertTrue(all(abs(p.yaw_deg) <= 40.0 for p in on))
+        # window w=1: 3 selectable + 1 peeking (start is pinned left).
+        self.assertEqual(len(on), 4)
+        self.assertTrue(all(abs(p.yaw_deg) <= 40.0 + 22.0 for p in on))
         # Scrolling to the far end keeps the flags in sync.
         for _ in range(8):
             sc_.move_selection(+1)
         on = [p.id for p in sc_.panels if not p.data.get("offstage")]
         self.assertIn("8", on)
-        self.assertEqual(len(on), 3)
+        self.assertEqual(len(on), 4)
 
     def test_short_row_has_no_offstage_panels(self):
         sc_ = scene.LauncherScene()

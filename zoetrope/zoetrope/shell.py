@@ -404,16 +404,20 @@ class Shell:
         for panels in self.scene.rows:
             step = self.scene._row_step(panels)
             n = len(panels)
+            card_w = max(p.width_m for p in panels) * deg_per_m
             if step * (n - 1) <= lay.arc_span_deg:
                 spread = step * (n - 1) / 2.0
+                margin = 3.0
             else:
                 # Windowed row: hug the *visible* window (mirrors
                 # _relayout_row), not the arc cap — otherwise a long
                 # rail blows the slab out to maximum width while only
-                # a few cards actually show.
+                # a few cards actually show. Extra margin gives the
+                # peeking next card ~25-35% of visible width before the
+                # rim fade cuts it.
                 spread = max(1, int(lay.arc_span_deg / 2.0 / step)) * step
-            card = (max(p.width_m for p in panels) / 2.0) * deg_per_m * 1.06
-            half_arc = max(half_arc, spread + card + 3.0)
+                margin = 0.35 * card_w + 2.0
+            half_arc = max(half_arc, spread + (card_w / 2.0) * 1.06 + margin)
         half_arc = min(half_arc, self.SLAB_HALF_ARC_RANGE[1])
         # Headings left-aligned inside the slab (SteamVR-style).
         for panel in self._chrome:
@@ -442,13 +446,14 @@ class Shell:
 
     def backdrop(self) -> tuple | None:
         """The dashboard slab for the renderer: ``(rev, vertices,
-        (w_m, h_m))``; None while an app is focused (launcher hidden)."""
+        (w_m, h_m), half_arc_deg)`` — the arc doubles as the card
+        clip/fade limit; None while an app is focused (launcher hidden)."""
         if self.mode != LAUNCHER:
             return None
         if self._backdrop is None or self._backdrop[0] != self._backdrop_rev:
             half_arc, y0, y1 = self._slab
             verts, size = backdrop_mesh(self.scene.layout, half_arc, y0, y1)
-            self._backdrop = (self._backdrop_rev, verts, size)
+            self._backdrop = (self._backdrop_rev, verts, size, half_arc)
         return self._backdrop
 
     def _install_clock(self):
