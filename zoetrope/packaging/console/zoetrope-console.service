@@ -25,6 +25,10 @@ StandardOutput=journal
 StandardError=journal
 UtmpIdentifier=tty8
 UtmpMode=user
+# Let the desktop compositor finish digesting the glasses' hotplug (they add
+# HID/audio/net devices) before we take the seat: switching VTs mid-hotplug
+# segfaulted Mutter 49.6's libinput input thread (seen 2026-07-31).
+ExecStartPre=/usr/bin/sleep 2
 # Remember the VT we came from, then switch to VT8 (runs as root: '+').
 ExecStartPre=+/usr/local/libexec/zoetrope/zoetrope-vt save-and-switch
 ExecStart=/usr/bin/sway -c /etc/zoetrope/sway-kiosk.conf

@@ -13,6 +13,9 @@
 ZOETROPE_DIR=/home/rob/projects/beampro/zoetrope
 [ -r /etc/zoetrope/console.conf ] && . /etc/zoetrope/console.conf
 
+# For altmode_failed: only kernel messages after this session started count.
+START_TS=$(date '+%Y-%m-%d %H:%M:%S')
+
 outputs_json() { swaymsg -t get_outputs -r 2>/dev/null; }
 
 detect() {
@@ -35,6 +38,24 @@ for o in outs or []:
 print(name, sbs)
 ' 2>/dev/null || echo '- 0')"
     [ -n "$DET_OUT" ] || DET_OUT=-
+}
+
+altmode_failed() {
+    # amdgpu logs this when the USB-C DP alt-mode handshake fails; the kernel
+    # does not retry on its own, so the DP output will never appear — only a
+    # replug renegotiates. (Journal read needs wheel/adm/systemd-journal.)
+    journalctl -k -b --since "$START_TS" --no-pager -q 2>/dev/null |
+        grep -q 'Alt mode has timed out'
+}
+
+DP_FAIL_NAGGED=0
+nag_dp_failed() {
+    [ "$DP_FAIL_NAGGED" = 1 ] && return
+    DP_FAIL_NAGGED=1
+    echo "zoetrope-kiosk: USB-C DP alt mode timed out — glasses display cannot appear; replug needed"
+    swaynag -t warning \
+        -m 'Glasses DP link failed (USB-C alt mode timed out). Unplug, wait ~15 s for the glasses to power down, then replug.' \
+        >/dev/null 2>&1 &
 }
 
 glasses_usb_present() {
@@ -62,7 +83,17 @@ WAITED=0
 while :; do
     detect
     [ "$DET_OUT" != "-" ] && break
-    if glasses_usb_present; then LIMIT=120; else LIMIT=10; fi   # half-second ticks
+    if glasses_usb_present; then
+        LIMIT=120   # half-second ticks
+        if [ "$WAITED" -ge 4 ] && altmode_failed; then
+            # The DP output will never appear this session; tell the user and
+            # stop sitting on a dark screen for the full 60 s.
+            nag_dp_failed
+            LIMIT=20
+        fi
+    else
+        LIMIT=10
+    fi
     if [ "$WAITED" -ge "$LIMIT" ]; then
         [ "$LIMIT" = 120 ] && echo "zoetrope-kiosk: glasses on USB but no DP output after 60s!"
         break
