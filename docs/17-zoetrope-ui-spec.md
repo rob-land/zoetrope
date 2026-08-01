@@ -69,6 +69,33 @@ vertical slot):
 - Selection-to-playback ≤ 2 activations: Resume rail plays directly;
   Movies rail opens the title's card → play.
 
+## 2b. Dashboard slab (2026-07-31)
+
+The rails now sit on **one curved slab** (SteamVR-dashboard form,
+requested after comparing against Valve's VR dashboard): a cylindrical
+strip behind the tiles (`scene.backdrop_mesh`, +0.08 m radius bias,
+same end-pull warp), rounded corners + glass fill/stroke drawn in a
+metric-UV shader (`renderer.BACKDROP_*`). SteamVR's near-black slab
+translates to the §4 glass tokens — on the additive display an opaque
+dark panel is impossible anyway (black = transparent).
+
+- **Row order flips**: the **Apps/source rail is the top row**
+  (Jellyfin — or its Quick Connect tile — 3D Gallery, All Movies,
+  Terminal; Plex/Grayjay slot in as the shared provider layer grows).
+  Below it, one **continue-watching rail per source** (Jellyfin resume
+  today; the local library rail is the fallback band).
+- Each rail gets a small-caps **heading** at the slab's left edge
+  (`make_label`); the clock moves into the slab's **bottom bar**,
+  right-aligned (`shell.rail_rhythm` owns the vertical rhythm).
+- The slab's arc **hugs the widest rail** (clamped 26–52° half-arc) so
+  sparse pages get a snug panel; it disappears entirely in app/theater
+  mode.
+- Fixed en route: `model_matrix` rotated panels by *+azimuth*, turning
+  them away from the viewer by 2× their yaw (edge-on by ~45°; the slab
+  chrome exposed it). Panels now face the viewer at any azimuth — the
+  hardware-tuned `end_pull_m` was calibrated against the buggy facing
+  and may want a re-tune on glasses.
+
 ## 3. Focus, reticle, and input
 
 - **Targets ≥ 80×80 dmm** with 16 dmm padding (head-gaze floor; the

@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 from . import mathutil as m
-from .scene import CylinderLayout, LauncherScene, Panel, _wrap180
+from .scene import CylinderLayout, LauncherScene, Panel, _wrap180, backdrop_mesh
 from .stereo import HeadPose, head_yaw
-from .apps.base import App, clock_image, make_tile, pil_to_texture
+from .apps.base import App, clock_image, make_label, make_tile, pil_to_texture
 from .apps.photo import GalleryApp, PhotoApp
 from . import library
 from .apps.movie import MovieApp
@@ -63,6 +63,28 @@ def gaze_may_select(lock_yaw_deg: float | None, yaw_deg: float,
                     threshold_deg: float = GAZE_RESUME_DEG) -> bool:
     """True when gaze selection is allowed: no keyboard lock, or head moved past it."""
     return lock_yaw_deg is None or abs(_wrap180(yaw_deg - lock_yaw_deg)) > threshold_deg
+
+
+# --- dashboard-slab vertical rhythm (doc 17 §2b) ---------------------------
+# Each rail gets a heading band above it; the bottom bar (clock) closes
+# the slab. All values are meters at the cylinder.
+LABEL_BAND_M = 0.06     # rail heading strip (text ~0.045 tall inside it)
+ROW_GAP_M = 0.06
+SLAB_Y_TOP = 0.55       # top edge of the first heading band
+BAR_H_M = 0.12          # bottom (clock) bar height
+
+
+def rail_rhythm(row_heights: list[float],
+                y_top: float = SLAB_Y_TOP) -> tuple[list[tuple[float, float]], float]:
+    """Walk the rails top-down: returns ``([(label_y, row_y), ...], bar_y)``
+    — vertical centers for each rail's heading and cards, and for the
+    bottom bar. Pure so the layout is testable without GL."""
+    out = []
+    y = y_top
+    for h in row_heights:
+        out.append((y - LABEL_BAND_M / 2.0, y - LABEL_BAND_M - h / 2.0))
+        y -= LABEL_BAND_M + h + ROW_GAP_M
+    return out, y - BAR_H_M / 2.0
 
 _PHOTO_EXTS = (".mpo", ".jpg", ".jpeg", ".png", ".heic", ".heif")
 _MOVIE_EXTS = (".mp4", ".mkv", ".mov", ".webm", ".m4v")
@@ -185,17 +207,26 @@ class Shell:
             # Nothing configured: try Jellyfin UDP discovery; a find
             # surfaces the Connect tile via a rails rebuild.
             hub.start_discovery(self._pending_rails.put)
+        self._chrome: list[Panel] = []       # rail headings (non-selectable)
+        self._backdrop_rev = 0               # bumped on relayout
+        self._backdrop = None                # cached (rev, verts, size_m)
+        self._slab = (self.SLAB_HALF_ARC_RANGE[0], -0.8, 0.6)
         self._rows = self._build_home_rows()
-        self._tiles = [t for r in self._rows for t in r]
-        self._install_tiles()
+        self._tiles = [t for _, r in self._rows for t in r]
         self._clock = self._install_clock()
+        self._install_tiles()
 
     # --- tiles -------------------------------------------------------------
-    # Home rail geometry (doc 17 §2): movie posters above, apps below,
-    # ambient strip at the bottom edge.
+    # Dashboard slab (doc 17 §2b, SteamVR-dashboard form): the app/source
+    # rail on top, continue-watching rails below, clock in the bottom
+    # bar — all on one curved glass slab.
     HOME_RAIL_MOVIES = 8
+    #: slab horizontal half-arc bounds: it hugs the widest rail (short
+    #: rows get a snug slab) but never exceeds what the ±40° scroll
+    #: window plus the widest card can reach.
+    SLAB_HALF_ARC_RANGE = (26.0, 52.0)
 
-    def _build_home_rows(self) -> list[list[Tile]]:
+    def _build_home_rows(self) -> list[tuple[str, list[Tile]]]:
         photos = library.scan_photos(self.library_roots)
         movies = library.scan_movies(self.library_roots,
                                      limit=self.HOME_RAIL_MOVIES)
@@ -204,23 +235,22 @@ class Shell:
         photo_sub = (f"{len(photos)} photo{'s' if len(photos) != 1 else ''}"
                      if photos else "no photos")
         resume = self._net.get("resume") or []
-        if resume:
-            # Doc 17 §8a: home's media band is the resume rail once a
-            # backend provides one; the local rail is the fallback.
-            movie_rail = [
-                Tile(f"resume:{i}", e.title, "",
-                     lambda en=e: self._open_entry(en),
-                     icon="movie", thumb=_entry_thumb(e), poster=True)
-                for i, e in enumerate(resume)
-            ]
-        else:
-            movie_rail = [
-                Tile(f"home-movie:{i}", mv.title, "",
-                     lambda m=mv: self._open_movie(m),
-                     icon="movie", thumb=_poster_thumb(mv), poster=True)
-                for i, mv in enumerate(movies)
-            ]
-        app_rail = [
+        # Top rail: apps & sources (Jellyfin now; Plex/Grayjay slot in
+        # here as the shared provider layer grows).
+        app_rail = []
+        if self.hub is not None and self.hub.enabled:
+            app_rail.append(Tile(
+                "jellyfin", "Jellyfin",
+                self.hub.server_name or "movies & shows",
+                self._open_movies_page, icon="movie",
+                thumb=_entry_thumb(resume[0]) if resume else None))
+        elif self.hub is not None and self.hub.has_server:
+            from .apps.connect import QuickConnectApp
+            app_rail.append(Tile(
+                "jellyfin-connect", "Connect Jellyfin",
+                self.hub.server_name or "Quick Connect",
+                lambda: QuickConnectApp(self.ctx, self.hub), icon="movie"))
+        app_rail += [
             Tile("gallery", "3D Gallery", photo_sub,
                  lambda ps=photos: GalleryApp(self.ctx, ps),
                  icon="photo",
@@ -231,14 +261,26 @@ class Shell:
             Tile("term", "Terminal", os.path.basename(os.environ.get("SHELL", "sh")),
                  self._open_term, icon="term"),
         ]
-        if (self.hub is not None and self.hub.has_server
-                and not self.hub.enabled):
-            from .apps.connect import QuickConnectApp
-            app_rail.append(Tile(
-                "jellyfin-connect", "Connect Jellyfin",
-                self.hub.server_name or "Quick Connect",
-                lambda: QuickConnectApp(self.ctx, self.hub), icon="movie"))
-        return [r for r in (movie_rail, app_rail) if r]
+        rows: list[tuple[str, list[Tile]]] = [("Apps", app_rail)]
+        # Below: one continue-watching rail per source that provides one
+        # (Jellyfin resume today); the local library is the fallback so
+        # the slab always has a media band.
+        if resume:
+            src = self.hub.server_name or "Jellyfin"
+            rows.append((f"Continue watching · {src}", [
+                Tile(f"resume:{i}", e.title, "",
+                     lambda en=e: self._open_entry(en),
+                     icon="movie", thumb=_entry_thumb(e), poster=True)
+                for i, e in enumerate(resume)
+            ]))
+        elif movies:
+            rows.append(("Library", [
+                Tile(f"home-movie:{i}", mv.title, "",
+                     lambda m=mv: self._open_movie(m),
+                     icon="movie", thumb=_poster_thumb(mv), poster=True)
+                for i, mv in enumerate(movies)
+            ]))
+        return rows
 
     def _build_movie_tiles(self) -> list[Tile]:
         movies = library.scan_movies(self.library_roots, limit=self.MOVIE_PAGE_LIMIT)
@@ -283,8 +325,8 @@ class Shell:
     def _set_page(self, page: str) -> None:
         self._page = page
         self._rows = (self._build_home_rows() if page == "home"
-                      else [self._build_movie_tiles()])
-        self._tiles = [t for r in self._rows for t in r]
+                      else [("All Movies", self._build_movie_tiles())])
+        self._tiles = [t for _, r in self._rows for t in r]
         self._install_tiles()
 
     def _open_term(self):
@@ -295,15 +337,15 @@ class Shell:
             print("[shell] terminal needs pyte:  pip install -e '.[term]'")
             return None
 
-    # Vertical rail centers (meters at the arc). Sized so the rails and
-    # the clock strip never overlap: posters [0.05..0.59], apps
-    # [-0.44..-0.04], clock [-0.67..-0.53].
-    ROW_Y = (0.32, -0.24)
-
     def _install_tiles(self) -> None:
+        """Lay the labeled rails out on the slab (doc 17 §2b): headings
+        above each rail, cards below, clock parked in the bottom bar."""
+        heights = [0.54 if any(t.poster for t in tiles) else 0.40
+                   for _, tiles in self._rows]
+        rhythm, _ = rail_rhythm(heights)
         rows = []
-        for i, tiles in enumerate(self._rows):
-            y = self.ROW_Y[i] if i < len(self.ROW_Y) else -0.24 - 0.46 * (i - 1)
+        for i, (label, tiles) in enumerate(self._rows):
+            _, y = rhythm[i]
             panels = []
             for t in tiles:
                 if t.poster:
@@ -323,6 +365,67 @@ class Shell:
                 ))
             rows.append(panels)
         self.scene.set_rows(rows)
+        # Rail headings (textures made once here; positioned below).
+        self._chrome = []
+        for i, (label, _tiles) in enumerate(self._rows):
+            lab = make_label(self.ctx, label) if label else None
+            if lab is None:
+                continue
+            tex, aspect = lab
+            h_m = 0.045
+            self._chrome.append(Panel(
+                id=f"_label:{i}", title=label, yaw_deg=0.0,
+                width_m=h_m * aspect, height_m=h_m, y_m=rhythm[i][0],
+                radius_bias=0.02, texture=tex, stereo_mode="mono"))
+        self._layout_chrome()
+
+    def _layout_chrome(self) -> None:
+        """Geometry-only pass: slab arc, heading/clock placement, slab
+        extent. Cheap (no texture work)."""
+        heights = [0.54 if any(t.poster for t in tiles) else 0.40
+                   for _, tiles in self._rows]
+        rhythm, bar_y = rail_rhythm(heights)
+        lay = self.scene.layout
+        deg_per_m = math.degrees(1.0 / lay.radius_m)
+        # Slab arc: hug the widest rail. A row's reach is its full
+        # centered spread or the scroll window, whichever is smaller,
+        # plus half the widest card (and the focus zoom).
+        half_arc = self.SLAB_HALF_ARC_RANGE[0]
+        for panels in self.scene.rows:
+            step = self.scene._row_step(panels)
+            spread = min(step * (len(panels) - 1) / 2.0,
+                         lay.arc_span_deg / 2.0)
+            card = (max(p.width_m for p in panels) / 2.0) * deg_per_m * 1.06
+            half_arc = max(half_arc, spread + card + 3.0)
+        half_arc = min(half_arc, self.SLAB_HALF_ARC_RANGE[1])
+        # Headings left-aligned inside the slab (SteamVR-style).
+        for panel in self._chrome:
+            panel.yaw_deg = (-half_arc + 2.5
+                             + (panel.width_m / 2.0) * deg_per_m)
+        # Clock into the bottom bar, right-aligned but clear of the
+        # rounded corner (the flat quad chords the curve).
+        if self._clock is not None:
+            half_w_deg = (self._clock.width_m / 2.0) * deg_per_m
+            self._clock.yaw_deg = half_arc - 5.0 - half_w_deg
+            # Above the bar center: the flat quad chords the curved
+            # slab, whose projected edge climbs toward the corners
+            # (measured headless, not derived).
+            self._clock.y_m = bar_y + 0.04
+        # Slab extent: wrap the headings/rails/bar with a small margin.
+        self._slab = (half_arc, bar_y - BAR_H_M / 2.0 - 0.10,
+                      SLAB_Y_TOP + 0.05)
+        self._backdrop_rev += 1
+
+    def backdrop(self) -> tuple | None:
+        """The dashboard slab for the renderer: ``(rev, vertices,
+        (w_m, h_m))``; None while an app is focused (launcher hidden)."""
+        if self.mode != LAUNCHER:
+            return None
+        if self._backdrop is None or self._backdrop[0] != self._backdrop_rev:
+            half_arc, y0, y1 = self._slab
+            verts, size = backdrop_mesh(self.scene.layout, half_arc, y0, y1)
+            self._backdrop = (self._backdrop_rev, verts, size)
+        return self._backdrop
 
     def _install_clock(self):
         try:
@@ -331,11 +434,11 @@ class Shell:
             return None
         self._clock_tex = pil_to_texture(self.ctx, img)
         self._clock_minute = time.localtime().tm_min
-        # Bottom ambient strip: up-gaze is fatiguing (doc 17 §0), so
-        # ambient chrome lives below the rails, glanceable on look-down.
+        # Lives in the slab's bottom bar (doc 17 §2b); _install_tiles
+        # sets its yaw/height to the current layout.
         return Panel(id="_clock", title="clock", yaw_deg=0.0,
-                     width_m=0.48, height_m=0.14, y_m=-0.60,
-                     radius_bias=-0.05,
+                     width_m=0.40, height_m=0.11, y_m=-0.70,
+                     radius_bias=0.02,
                      texture=self._clock_tex, stereo_mode="mono")
 
     def _update_clock(self) -> None:
@@ -480,6 +583,8 @@ class Shell:
             if panel is selected:            # gentle zoom on the focused tile
                 model = m.mat4_mul(model, _uniform_scale(1.06))
             out.append((panel, model))
+        for panel in self._chrome:           # rail headings (non-selectable)
+            out.append((panel, self.scene.layout.model_matrix(panel)))
         if self._clock is not None:
             out.append((self._clock, self.scene.layout.model_matrix(self._clock)))
         return out

@@ -136,6 +136,25 @@ def make_tile(ctx, title: str, subtitle: str = "", w: int = 512, h: int = 320,
     return pil_to_texture(ctx, img)
 
 
+def make_label(ctx, text: str, h_px: int = 56):
+    """A rail heading (SteamVR-dashboard style, doc 17 §2b): small
+    spaced caps in secondary white on a transparent strip. Returns
+    ``(texture, aspect)`` so the shell can size the panel; None when
+    Pillow is missing (headings simply disappear)."""
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        return None
+    text = " ".join(text.upper())      # letterspacing PIL can't do natively
+    font = _load_font(int(h_px * 0.62))
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    w_px = max(1, int(probe.textlength(text, font=font))) + 8
+    img = Image.new("RGBA", (w_px, h_px), (0, 0, 0, 0))
+    ImageDraw.Draw(img).text((4, int(h_px * 0.12)), text, font=font,
+                             fill=(255, 255, 255, 178))
+    return pil_to_texture(ctx, img), w_px / h_px
+
+
 def clock_image(w: int = 640, h: int = 180, when=None):
     """The ambient clock strip (a PIL image; the shell uploads + refreshes it)."""
     import time as _time

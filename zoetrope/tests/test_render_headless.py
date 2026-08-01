@@ -62,7 +62,8 @@ class TestHeadlessRender(unittest.TestCase):
         self.assertGreater(len(set(pixels)), 1, "framebuffer is uniform; nothing drew")
 
     def test_shell_launcher_frame_with_cursor(self):
-        """Full launcher path headlessly: tiles + clock panel + pointer cursor."""
+        """Full launcher path headlessly: dashboard slab + labeled rails
+        + clock + pointer cursor."""
         import tempfile
 
         from zoetrope.renderer import StereoRenderer
@@ -76,10 +77,17 @@ class TestHeadlessRender(unittest.TestCase):
         with tempfile.TemporaryDirectory() as media:
             shell = Shell(self.ctx, media, None)
             shell.update(1 / 60, stereo.HeadPose())
+            backdrop = shell.backdrop()
+            self.assertIsNotNone(backdrop)
             eyes = stereo.eye_matrices(stereo.HeadPose(), w, h, 48.0, 0.063)
             renderer.render((w, h), shell.panels_models(), eyes,
                             shell.floor_model(), shell.selected_id(),
-                            target=fbo, cursor=(12.0, -4.0))
+                            target=fbo, cursor=(12.0, -4.0),
+                            backdrop=backdrop)
+            # Same revision on the next frame: the cached VAO is reused.
+            renderer.render((w, h), shell.panels_models(), eyes,
+                            shell.floor_model(), shell.selected_id(),
+                            target=fbo, backdrop=shell.backdrop())
             shell.close()
         self.assertGreater(len(set(fbo.read(components=3))), 1)
 

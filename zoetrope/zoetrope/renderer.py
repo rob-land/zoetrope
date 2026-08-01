@@ -56,6 +56,40 @@ void main() {
 }
 """
 
+BACKDROP_VS = """
+#version 330
+uniform mat4 mvp;
+in vec3 in_pos;
+in vec2 in_uv;
+out vec2 v_uv;
+void main() {
+    v_uv = in_uv;
+    gl_Position = mvp * vec4(in_pos, 1.0);
+}
+"""
+
+BACKDROP_FS = """
+#version 330
+uniform vec2 size_m;      // slab (arc-length, height) in meters
+in vec2 v_uv;
+out vec4 frag;
+void main() {
+    // Rounded-rect SDF in meters so the corner radius is physical, not
+    // stretched by the slab's aspect (doc 17 §2b).
+    float corner = 0.06;
+    vec2 p = (v_uv - 0.5) * size_m;
+    vec2 q = abs(p) - (0.5 * size_m - corner);
+    float sdf = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - corner;
+    // Glass fill (token color.glass-fill), top-lit like the cards, cut
+    // off outside the rounded silhouette with a soft edge.
+    float inside = 1.0 - smoothstep(-0.004, 0.004, sdf);
+    float fill = (0.13 - 0.05 * v_uv.y) * inside;
+    // Glass stroke hugging the silhouette (token color.glass-stroke).
+    float stroke = (1.0 - smoothstep(0.0015, 0.006, abs(sdf))) * 0.35;
+    frag = vec4(vec3(1.0), fill + stroke);
+}
+"""
+
 CURSOR_FS = """
 #version 330
 in vec2 v_uv;
@@ -129,6 +163,11 @@ class StereoRenderer:
         # positions-only buffer rather than naming an attribute moderngl can't resolve.
         pos_vbo = ctx.buffer(struct.pack(f"{len(_QUAD_POS)}f", *_QUAD_POS))
         self.grid_vao = ctx.vertex_array(self.grid_prog, [(pos_vbo, "2f", "in_pos")])
+        self.backdrop_prog = ctx.program(vertex_shader=BACKDROP_VS,
+                                         fragment_shader=BACKDROP_FS)
+        self._backdrop_key = None
+        self._backdrop_vbo = None
+        self._backdrop_vao = None
         self.cursor_prog = ctx.program(vertex_shader=PANEL_VS, fragment_shader=CURSOR_FS)
         self.cursor_vao = ctx.vertex_array(
             self.cursor_prog, [(vbo, "2f 2f", "in_pos", "in_uv")])
@@ -148,13 +187,34 @@ class StereoRenderer:
             return tex, (0.0, 0.0), (1.0, 1.0)
         return panel.texture, (0.0, 0.0), (1.0, 1.0)
 
+    def _ensure_backdrop(self, backdrop) -> bool:
+        """Upload the slab mesh when it changes (keyed by revision);
+        True when there is a slab to draw."""
+        if backdrop is None:
+            return False
+        key, verts, size_m = backdrop
+        if key != self._backdrop_key:
+            if self._backdrop_vao is not None:
+                self._backdrop_vao.release()
+                self._backdrop_vbo.release()
+            self._backdrop_vbo = self.ctx.buffer(
+                struct.pack(f"{len(verts)}f", *verts))
+            self._backdrop_vao = self.ctx.vertex_array(
+                self.backdrop_prog, [(self._backdrop_vbo, "3f 2f",
+                                      "in_pos", "in_uv")])
+            self._backdrop_key = key
+        self.backdrop_prog["size_m"].value = size_m
+        return True
+
     def render(self, fb_size, panels_models, eyes: tuple[EyeMatrices, EyeMatrices],
                floor_model, selected_id: str | None, target=None, cursor=None,
-               void_theater: bool = False):
+               void_theater: bool = False, backdrop=None):
         """cursor: optional (yaw_deg, pitch_deg) of the controller ray; drawn as a
         glowing dot on the panel cylinder. void_theater blanks everything but
         the panels (pure black on the additive display = nothing drawn) for
-        cinema purity (doc 17 §5)."""
+        cinema purity (doc 17 §5). backdrop: optional (key, vertices,
+        (w_m, h_m)) dashboard slab from Shell.backdrop(), drawn behind
+        the rails."""
         ctx = self.ctx
         fbo = target if target is not None else ctx.screen
         fbo.use()
@@ -162,6 +222,7 @@ class StereoRenderer:
             ctx.clear(0.0, 0.0, 0.0, 1.0)
         else:
             ctx.clear(0.02, 0.03, 0.05, 1.0)
+        draw_backdrop = not void_theater and self._ensure_backdrop(backdrop)
         for eye_index, eye in enumerate(eyes):
             ctx.viewport = eye.viewport.as_tuple()
             vp = _mul(eye.proj, eye.view)  # proj * view
@@ -170,6 +231,11 @@ class StereoRenderer:
                 self.grid_prog["mvp"].write(_m4(_mul(vp, floor_model)))
                 self.grid_prog["model"].write(_m4(floor_model))
                 self.grid_vao.render(self.moderngl.TRIANGLES)
+            if draw_backdrop:
+                # The slab sits behind the rails; its vertices are
+                # already in world space (model = identity).
+                self.backdrop_prog["mvp"].write(_m4(vp))
+                self._backdrop_vao.render(self.moderngl.TRIANGLES)
             # panels
             for panel, model in panels_models:
                 tex, uv_off, uv_scale = self._eye_texture(panel, eye_index)

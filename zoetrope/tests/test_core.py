@@ -667,3 +667,48 @@ class TestRailShape(unittest.TestCase):
         assert MovieApp.preferred_dist == 2.7
         lo, hi = APP_DIST_RANGE
         assert lo <= MovieApp.preferred_dist <= hi
+
+
+class TestDashboardSlab(unittest.TestCase):
+    """The SteamVR-dashboard slab (doc 17 §2b): curved backdrop mesh +
+    the labeled-rail vertical rhythm."""
+
+    def test_rail_rhythm_stacks_top_down_without_overlap(self):
+        from zoetrope import shell as sh
+        rhythm, bar_y = sh.rail_rhythm([0.40, 0.54])
+        (l0, r0), (l1, r1) = rhythm
+        # Headings above their rails; everything walks downward.
+        self.assertGreater(l0, r0)
+        self.assertGreater(r0, l1)
+        self.assertGreater(l1, r1)
+        self.assertGreater(r1, bar_y)
+        # Row 0's cards clear row 1's heading band, and the last row
+        # clears the bottom bar.
+        self.assertGreaterEqual(r0 - 0.40 / 2,
+                                l1 + sh.LABEL_BAND_M / 2 - 1e-9)
+        self.assertGreaterEqual(r1 - 0.54 / 2,
+                                bar_y + sh.BAR_H_M / 2 - 1e-9)
+
+    def test_backdrop_mesh_wraps_behind_the_tiles(self):
+        lay = scene.CylinderLayout(radius_m=1.9, end_pull_m=0.25)
+        verts, (w_m, h_m) = scene.backdrop_mesh(
+            lay, 52.0, -0.8, 0.6, radius_bias=0.08, segments=26)
+        self.assertEqual(len(verts), 26 * 6 * 5)   # 2 tris/quad, xyzuv
+        self.assertTrue(approx(h_m, 1.4))
+        self.assertTrue(approx(w_m, 1.9 * math.radians(104.0)))
+        pts = [verts[i:i + 5] for i in range(0, len(verts), 5)]
+        self.assertEqual((min(p[3] for p in pts), max(p[3] for p in pts)),
+                         (0.0, 1.0))
+        self.assertEqual({p[4] for p in pts}, {0.0, 1.0})
+        # Every column sits behind the tile surface at the same yaw
+        # (same end-pull warp, offset by the radius bias).
+        for x, y, z, u, v in pts:
+            yaw = -52.0 + 104.0 * u
+            tile = lay.position(scene.Panel(id="t", title="", yaw_deg=yaw))
+            self.assertTrue(
+                approx(math.hypot(x, z), math.hypot(tile[0], tile[2]) + 0.08))
+        # The rim pulls toward the viewer at the edges, like the rails.
+        center_r = max(math.hypot(p[0], p[2]) for p in pts)
+        edge_r = min(math.hypot(p[0], p[2]) for p in pts)
+        self.assertTrue(approx(center_r, 1.98))
+        self.assertTrue(approx(edge_r, 1.98 - 0.25))

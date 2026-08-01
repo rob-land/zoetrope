@@ -229,3 +229,38 @@ class LauncherScene:
 def _wrap180(deg: float) -> float:
     """Wrap an angle to (-180, 180]."""
     return (deg + 180.0) % 360.0 - 180.0
+
+
+def backdrop_mesh(layout: CylinderLayout, half_arc_deg: float,
+                  y_bottom: float, y_top: float,
+                  radius_bias: float = 0.08, segments: int = 48):
+    """The dashboard slab: one curved surface behind the rails (SteamVR-
+    dashboard form, doc 17 §2b).
+
+    Returns ``(vertices, (width_m, height_m))`` where vertices is a flat
+    triangle list of (x, y, z, u, v) in world space. The strip follows
+    the same end-pull radius warp as the tiles (sitting `radius_bias`
+    behind them everywhere), u sweeps the arc, v sweeps bottom→top;
+    width_m is the arc length so the shader can round corners in meters.
+    """
+    verts: list[float] = []
+
+    def rim(yaw_deg: float) -> tuple[float, float]:
+        a = math.radians(yaw_deg)
+        pull = layout.end_pull_m * min(1.0, (abs(yaw_deg) / 45.0) ** 2)
+        r = layout.radius_m + radius_bias - pull
+        return r * math.sin(a), -r * math.cos(a)
+
+    cols = []
+    for s in range(segments + 1):
+        u = s / segments
+        yaw = -half_arc_deg + 2.0 * half_arc_deg * u
+        x, z = rim(yaw)
+        cols.append((x, z, u))
+    for (x0, z0, u0), (x1, z1, u1) in zip(cols, cols[1:]):
+        quad = [(x0, y_bottom, z0, u0, 0.0), (x1, y_bottom, z1, u1, 0.0),
+                (x1, y_top, z1, u1, 1.0), (x0, y_top, z0, u0, 1.0)]
+        for i in (0, 1, 2, 0, 2, 3):
+            verts.extend(quad[i])
+    width_m = layout.radius_m * math.radians(2.0 * half_arc_deg)
+    return verts, (width_m, y_top - y_bottom)
