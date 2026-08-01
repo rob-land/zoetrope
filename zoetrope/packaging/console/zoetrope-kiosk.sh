@@ -13,8 +13,11 @@
 ZOETROPE_DIR=/home/rob/projects/beampro/zoetrope
 [ -r /etc/zoetrope/console.conf ] && . /etc/zoetrope/console.conf
 
-# For altmode_failed: only kernel messages after this session started count.
-START_TS=$(date '+%Y-%m-%d %H:%M:%S')
+# For altmode_failed: the alt-mode timeout fires ~200 ms after the USB plug,
+# but this script starts seconds later (udev -> service settle sleep -> sway
+# boot) — so look back far enough to cover that gap, not just from script
+# start (which reliably missed it).
+START_TS=$(date '+%Y-%m-%d %H:%M:%S' -d '10 seconds ago')
 
 outputs_json() { swaymsg -t get_outputs -r 2>/dev/null; }
 
@@ -46,6 +49,14 @@ altmode_failed() {
     # replug renegotiates. (Journal read needs wheel/adm/systemd-journal.)
     journalctl -k -b --since "$START_TS" --no-pager -q 2>/dev/null |
         grep -q 'Alt mode has timed out'
+}
+
+STATUS_NAG=
+status_nag() {
+    # One persistent status bar on the laptop panel (replaced on relaunch).
+    [ -n "$STATUS_NAG" ] && kill "$STATUS_NAG" 2>/dev/null
+    swaynag -o eDP-1 -e top -y overlay -m "$1" >/dev/null 2>&1 &
+    STATUS_NAG=$!
 }
 
 DP_FAIL_NAGGED=0
@@ -108,12 +119,17 @@ while :; do
         echo "zoetrope-kiosk: glasses output $CUR_OUT (sbs_mode_present=$CUR_SBS)"
         [ "$CUR_SBS" = 1 ] && swaymsg output "$CUR_OUT" mode 3840x1080@60Hz
         swaymsg output "$CUR_OUT" enable
-        # Glasses-only: darken the laptop panel while in console mode.
-        swaymsg output eDP-1 disable
+        # Keep the laptop panel alive with a status bar. It used to be
+        # disabled here, but a black laptop made a healthy glasses
+        # session indistinguishable from a dead one — which invited
+        # unplugging the glasses just to check on the machine.
+        swaymsg output eDP-1 enable
+        status_nag "zoetrope is running on the glasses ($CUR_OUT). Ctrl+Alt+F2 = back to GNOME (session keeps running) - unplug the glasses to end it."
         ARGS="run --mode glasses"
     else
         echo "zoetrope-kiosk: no XREAL output — preview mode on laptop panel"
         swaymsg output eDP-1 enable
+        [ -n "$STATUS_NAG" ] && kill "$STATUS_NAG" 2>/dev/null && STATUS_NAG=
         ARGS="run --mode preview --sway"
     fi
 
