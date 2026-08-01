@@ -403,8 +403,15 @@ class Shell:
         half_arc = self.SLAB_HALF_ARC_RANGE[0]
         for panels in self.scene.rows:
             step = self.scene._row_step(panels)
-            spread = min(step * (len(panels) - 1) / 2.0,
-                         lay.arc_span_deg / 2.0)
+            n = len(panels)
+            if step * (n - 1) <= lay.arc_span_deg:
+                spread = step * (n - 1) / 2.0
+            else:
+                # Windowed row: hug the *visible* window (mirrors
+                # _relayout_row), not the arc cap — otherwise a long
+                # rail blows the slab out to maximum width while only
+                # a few cards actually show.
+                spread = max(1, int(lay.arc_span_deg / 2.0 / step)) * step
             card = (max(p.width_m for p in panels) / 2.0) * deg_per_m * 1.06
             half_arc = max(half_arc, spread + card + 3.0)
         half_arc = min(half_arc, self.SLAB_HALF_ARC_RANGE[1])
@@ -611,6 +618,8 @@ class Shell:
         out = []
         selected = self.scene.selected_panel
         for panel in self.scene.panels:
+            if panel.data.get("offstage"):     # beyond the scroll window
+                continue
             model = self.scene.layout.model_matrix(panel)
             if panel is selected:            # gentle zoom on the focused tile
                 model = m.mat4_mul(model, _uniform_scale(1.06))

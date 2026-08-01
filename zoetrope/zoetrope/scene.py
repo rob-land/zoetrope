@@ -132,6 +132,7 @@ class LauncherScene:
             step = min(step, self.layout.step_deg)
             for j, p in enumerate(row):
                 p.yaw_deg = -step * (n - 1) / 2.0 + step * j
+                p.data["offstage"] = False
             self._off[i] = 0
             return
         # Windowed leanback scroll: the window shifts only when the
@@ -146,6 +147,10 @@ class LauncherScene:
         self._off[i] = off
         for j, p in enumerate(row):
             p.yaw_deg = step * (j - off)
+            # Off-window cards are unselectable (select_by_yaw skips
+            # them) — and undrawable: rendered, they poke past the slab
+            # and pile up near ±90° where sin() flattens their spacing.
+            p.data["offstage"] = abs(p.yaw_deg) > half
 
     # -- selection -----------------------------------------------------------
 

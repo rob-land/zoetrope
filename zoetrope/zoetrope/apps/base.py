@@ -116,6 +116,26 @@ def _card_base(w: int, h: int, thumb=None):
     return img, d
 
 
+def _wrap_title(draw, text: str, font, max_w: int, max_lines: int = 2) -> list[str]:
+    """Greedy word-wrap by measured width; the last line is ellipsized.
+    Never returns more than `max_lines` lines."""
+    words = text.split()
+    lines: list[str] = []
+    cur = ""
+    for k, word in enumerate(words):
+        cand = f"{cur} {word}".strip()
+        if not cur or draw.textlength(cand, font=font) <= max_w:
+            cur = cand
+            continue
+        lines.append(cur)
+        if len(lines) == max_lines - 1:
+            return lines + [_ellipsize(draw, " ".join(words[k:]), font, max_w)]
+        cur = word
+    if cur:
+        lines.append(cur)
+    return [_ellipsize(draw, ln, font, max_w) for ln in lines] or [""]
+
+
 def make_tile(ctx, title: str, subtitle: str = "", w: int = 512, h: int = 320,
               icon: str | None = None, thumb=None):
     """Render a launcher tile to a texture: rounded card, optional icon glyph or
@@ -127,11 +147,23 @@ def make_tile(ctx, title: str, subtitle: str = "", w: int = 512, h: int = 320,
     img, d = _card_base(w, h, thumb=thumb)
     if icon and thumb is None:
         _draw_icon(d, icon, 40, 40, 64, (255, 255, 255, 220))
-    font = _load_font(44)
+    # Narrow (poster) cards get a smaller face and a two-line wrap so
+    # long movie titles don't clip at the card edge.
+    poster = w < 480
+    font = _load_font(34 if poster else 44)
+    line_h = 44 if poster else 56
     sub_font = _load_font(22)
-    d.text((36, h - 110), title, font=font, fill=(255, 255, 255, 255))
+    max_w = w - 72
+    if poster:
+        lines = _wrap_title(d, title, font, max_w)
+    else:
+        lines = [_ellipsize(d, title, font, max_w)]
+    y = h - 110 - line_h * (len(lines) - 1)
+    for ln in lines:
+        d.text((36, y), ln, font=font, fill=(255, 255, 255, 255))
+        y += line_h
     if subtitle:
-        d.text((36, h - 54), _ellipsize(d, subtitle, sub_font, w - 72),
+        d.text((36, h - 54), _ellipsize(d, subtitle, sub_font, max_w),
                font=sub_font, fill=(255, 255, 255, 178))
     return pil_to_texture(ctx, img)
 

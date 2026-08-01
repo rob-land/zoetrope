@@ -52,7 +52,7 @@ void main() {
     vec2 d = min(v_uv, 1.0 - v_uv);
     float edge = 1.0 - smoothstep(border * 0.6, border * 1.6, min(d.x, d.y));
     vec3 accent = vec3(0.208, 0.518, 0.894);   // suite token color.accent #3584e4
-    frag = mix(c, vec4(accent, c.a), edge * selected * 0.9 * c.a);
+    frag = mix(c, vec4(accent, c.a), edge * selected * c.a);
 }
 """
 
@@ -173,7 +173,10 @@ class StereoRenderer:
             self.cursor_prog, [(vbo, "2f 2f", "in_pos", "in_uv")])
         self.cursor_prog["uv_offset"].value = (0.0, 0.0)
         self.cursor_prog["uv_scale"].value = (1.0, 1.0)
-        self.panel_prog["border"].value = 0.015
+        # Focus-ring width in card-UV units. 0.015 read as a hairline on
+        # the glasses (hardware feedback 2026-07-31) — doubled, and drawn
+        # at full accent opacity.
+        self.panel_prog["border"].value = 0.03
         ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
         ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
 
