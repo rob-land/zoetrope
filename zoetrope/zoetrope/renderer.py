@@ -38,7 +38,8 @@ PANEL_FS = """
 #version 330
 uniform sampler2D tex;
 uniform float selected;   // 1.0 if this panel is focused
-uniform float border;     // border half-width in uv units
+uniform float border;     // focus-ring reach from the card edge, meters
+uniform vec2 panel_size;  // panel (width, height) in meters
 uniform float feather;    // edge fade half-width in uv units (0 = off)
 uniform float arc_limit;  // slab half-arc (deg); cards fade at the rim
 uniform float arc_fade;   // fade band width (deg)
@@ -60,8 +61,11 @@ void main() {
     }
     // Accent border when selected; scaled by the card's alpha so it hugs the
     // rounded silhouette instead of drawing a square frame over the corners.
-    vec2 d = min(v_uv, 1.0 - v_uv);
-    float edge = 1.0 - smoothstep(border * 0.6, border * 1.6, min(d.x, d.y));
+    // Measured in METERS via panel_size: a uv-space band is thinner on the
+    // short axis of a landscape card, and the texture's ~1 cm transparent
+    // inset swallowed the band's bright start on top/bottom.
+    vec2 dm = min(v_uv, 1.0 - v_uv) * panel_size;
+    float edge = 1.0 - smoothstep(border, border * 1.35, min(dm.x, dm.y));
     vec3 accent = vec3(0.208, 0.518, 0.894);   // suite token color.accent #3584e4
     frag = mix(c, vec4(accent, c.a), edge * selected * c.a);
 }
@@ -184,10 +188,10 @@ class StereoRenderer:
             self.cursor_prog, [(vbo, "2f 2f", "in_pos", "in_uv")])
         self.cursor_prog["uv_offset"].value = (0.0, 0.0)
         self.cursor_prog["uv_scale"].value = (1.0, 1.0)
-        # Focus-ring width in card-UV units. 0.015 read as a hairline on
-        # the glasses (hardware feedback 2026-07-31) — doubled, and drawn
-        # at full accent opacity.
-        self.panel_prog["border"].value = 0.03
+        # Focus-ring reach from the card edge in meters: the card alpha
+        # starts ~1 cm in (texture inset), so this yields a ~1.4 cm ring,
+        # equally thick on every side of any card aspect.
+        self.panel_prog["border"].value = 0.024
         ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
         ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
 
@@ -263,15 +267,25 @@ class StereoRenderer:
                 tex, uv_off, uv_scale = self._eye_texture(panel, eye_index)
                 if tex is None:
                     continue
+                # Chrome (rail headings, clock) sits visually ON the
+                # slab: flat quads chord the curved surface, so depth
+                # testing would bury their ends behind it.
+                overlay = bool(panel.data.get("overlay"))
+                if overlay:
+                    ctx.disable(self.moderngl.DEPTH_TEST)
                 tex.use(location=0)
                 self.panel_prog["tex"].value = 0
                 self.panel_prog["mvp"].write(_m4(_mul(vp, model)))
                 self.panel_prog["model"].write(_m4(model))
+                self.panel_prog["panel_size"].value = (panel.width_m,
+                                                       panel.height_m)
                 self.panel_prog["uv_offset"].value = uv_off
                 self.panel_prog["uv_scale"].value = uv_scale
                 self.panel_prog["selected"].value = 1.0 if panel.id == selected_id else 0.0
                 self.panel_prog["feather"].value = float(panel.data.get("feather", 0.0))
                 self.panel_vao.render(self.moderngl.TRIANGLES)
+                if overlay:
+                    ctx.enable(self.moderngl.DEPTH_TEST)
             if cursor is not None:
                 ctx.disable(self.moderngl.DEPTH_TEST)   # always visible on top
                 self.cursor_prog["mvp"].write(_m4(_mul(vp, _cursor_model(*cursor))))

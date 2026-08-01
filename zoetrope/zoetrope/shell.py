@@ -252,7 +252,7 @@ class Shell:
             app_rail.append(Tile(
                 "jellyfin", "Jellyfin",
                 self.hub.server_name or "movies & shows",
-                self._open_movies_page, icon="movie",
+                self._open_jellyfin_page, icon="movie",
                 thumb=_entry_thumb(resume[0]) if resume else None))
         elif self.hub is not None and self.hub.has_server:
             from .apps.connect import QuickConnectApp
@@ -276,7 +276,7 @@ class Shell:
         # (Jellyfin resume today); the local library is the fallback so
         # the slab always has a media band.
         if resume:
-            src = self.hub.server_name or "Jellyfin"
+            src = (self.hub.server_name if self.hub else None) or "Jellyfin"
             rows.append((f"Continue watching · {src}", [
                 Tile(f"resume:{i}", e.title, "",
                      lambda en=e: self._open_entry(en),
@@ -328,14 +328,47 @@ class Shell:
         self._set_page("movies")
         return None
 
+    def _open_jellyfin_page(self) -> None:
+        self._set_page("jellyfin")
+        return None
+
+    def _build_jellyfin_rows(self) -> list[tuple[str, list[Tile]]]:
+        """The Jellyfin source page: that server's rails only (the
+        All Movies page stays the local/merged view)."""
+        name = self.hub.server_name if self.hub else None
+        name = name or "Jellyfin"
+        resume = self._net.get("resume") or []
+        movies = self._net.get("movies") or []
+        back = Tile("_back", "‹ Back", "launcher", self._open_home_page,
+                    icon=None)
+        rows: list[tuple[str, list[Tile]]] = []
+        if resume:
+            rows.append((f"Continue watching · {name}", [
+                Tile(f"jf-resume:{i}", e.title, "",
+                     lambda en=e: self._open_entry(en),
+                     icon="movie", thumb=_entry_thumb(e), poster=True)
+                for i, e in enumerate(resume)
+            ]))
+        rows.append((f"Movies · {name}", [back] + [
+            Tile(f"jf-movie:{i}", e.title, str(e.year or ""),
+                 lambda en=e: self._open_entry(en),
+                 icon="movie", thumb=_entry_thumb(e), poster=True)
+            for i, e in enumerate(movies)
+        ]))
+        return rows
+
     def _open_home_page(self) -> None:
         self._set_page("home")
         return None
 
     def _set_page(self, page: str) -> None:
         self._page = page
-        self._rows = (self._build_home_rows() if page == "home"
-                      else [("All Movies", self._build_movie_tiles())])
+        if page == "home":
+            self._rows = self._build_home_rows()
+        elif page == "jellyfin":
+            self._rows = self._build_jellyfin_rows()
+        else:
+            self._rows = [("All Movies", self._build_movie_tiles())]
         self._tiles = [t for _, r in self._rows for t in r]
         self._install_tiles()
 
@@ -386,7 +419,11 @@ class Shell:
             self._chrome.append(Panel(
                 id=f"_label:{i}", title=label, yaw_deg=0.0,
                 width_m=h_m * aspect, height_m=h_m, y_m=rhythm[i][0],
-                radius_bias=0.02, texture=tex, stereo_mode="mono"))
+                radius_bias=0.02, texture=tex, stereo_mode="mono",
+                # Chrome draws depth-test-off: a wide flat label chords
+                # the curved slab and its corners dip behind the surface
+                # (end-pull bows the slab in faster than the chord).
+                data={"overlay": True}))
         self._layout_chrome()
 
     def _layout_chrome(self) -> None:
@@ -419,9 +456,11 @@ class Shell:
                 margin = 0.35 * card_w + 2.0
             half_arc = max(half_arc, spread + (card_w / 2.0) * 1.06 + margin)
         half_arc = min(half_arc, self.SLAB_HALF_ARC_RANGE[1])
-        # Headings left-aligned inside the slab (SteamVR-style).
+        # Headings left-aligned inside the slab (SteamVR-style), clear
+        # of the rim fade band (arc_fade 2.5° + 0.5° inset in the
+        # renderer) that was eating the heading's first characters.
         for panel in self._chrome:
-            panel.yaw_deg = (-half_arc + 2.5
+            panel.yaw_deg = (-half_arc + 4.0
                              + (panel.width_m / 2.0) * deg_per_m)
         # Clock into the bottom bar, right-aligned but clear of the
         # rounded corner (the flat quad chords the curve).
@@ -468,7 +507,8 @@ class Shell:
         return Panel(id="_clock", title="clock", yaw_deg=0.0,
                      width_m=0.40, height_m=0.11, y_m=-0.70,
                      radius_bias=0.02,
-                     texture=self._clock_tex, stereo_mode="mono")
+                     texture=self._clock_tex, stereo_mode="mono",
+                     data={"overlay": True})
 
     def _update_clock(self) -> None:
         if self._clock is None:
