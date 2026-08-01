@@ -57,10 +57,18 @@ class CylinderLayout:
         return (r * math.sin(a), panel.y_m, -r * math.cos(a))
 
     def model_matrix(self, panel: Panel) -> Mat4:
-        """Panel transform: translate onto the cylinder, yaw to face the center."""
+        """Panel transform: translate onto the cylinder, yaw to face the center.
+
+        q_from_axis_angle(+Y, a) turns the quad's +Z normal to
+        (sin a, 0, cos a); at azimuth `yaw` (position +x for +yaw) facing
+        the origin needs (-sin, 0, cos), i.e. a rotation by *minus* the
+        azimuth — same negation _cursor_model documents. The old +yaw
+        turned tiles away from the viewer by 2x their azimuth (edge-on
+        sliver by ~45 deg; unnoticed while everything sat near center).
+        """
         pos = self.position(panel)
         rot = m.mat4_from_quat(
-            m.q_from_axis_angle((0.0, 1.0, 0.0), math.radians(panel.yaw_deg))
+            m.q_from_axis_angle((0.0, 1.0, 0.0), -math.radians(panel.yaw_deg))
         )
         scale = m.mat4_identity()
         scale[0] = panel.width_m

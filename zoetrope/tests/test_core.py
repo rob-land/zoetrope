@@ -647,6 +647,20 @@ class TestRailShape(unittest.TestCase):
         self.assertTrue(approx(dc, 1.9))
         self.assertTrue(approx(de, 1.65))   # full pull at 45 deg
 
+    def test_panels_face_the_viewer_at_any_azimuth(self):
+        """Regression: +yaw rotation turned tiles away from the viewer by
+        2x their azimuth (edge-on sliver by ~45 deg — the slab
+        chrome exposed it)."""
+        lay = scene.CylinderLayout(radius_m=1.9, end_pull_m=0.25)
+        for yaw in (0.0, 22.0, 43.5, -48.0):
+            mm = lay.model_matrix(scene.Panel(id="p", title="", yaw_deg=yaw))
+            nx, nz = mm[8], mm[10]        # col2: the quad's +Z normal
+            px, pz = mm[12], mm[14]       # col3: position on the cylinder
+            dot = ((nx * -px + nz * -pz)
+                   / (math.hypot(nx, nz) * math.hypot(px, pz)))
+            self.assertGreater(dot, 0.999,
+                               f"yaw {yaw}: panel not facing the viewer")
+
     def test_movie_opens_well_back(self):
         from zoetrope.apps.movie import MovieApp
         from zoetrope.shell import APP_DIST_RANGE
