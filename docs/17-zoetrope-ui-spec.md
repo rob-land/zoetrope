@@ -278,6 +278,70 @@ chains, tiny toolbars. **Transfers both ways:** parallax tilt on the
 focused card (thumb micro-motion on tvOS ≡ sub-threshold head motion
 here).
 
+## 8c. Couch as the hosted interface (decided 2026-08-01)
+
+§8b's "a zoetrope panel should render *the same rails couch renders*"
+becomes literal: **couch's actual UI, projected onto a panel in the
+spatial stage, replaces zoetrope's native rails as the media
+interface.** Rationale: the two implementations exhibit the same bug
+classes (focus-ring geometry, clipped titles, buried/missing rail
+headings — see zoetrope commits `bcee9fd`/`00aba22` and the matching
+couch symptoms), so "shared design language, separate implementations"
+means fixing everything twice. Couch is also far ahead as an
+application (profiles, kid-mode, search, detail pages, settings,
+watch state) and its GTK stack solves text/focus/layout problems
+zoetrope's GL+PIL stack re-derives one bug at a time.
+
+**Architecture — no new compositor:**
+
+- The kiosk's sway (wlroots) gains a **headless output**; couch runs
+  there fullscreen at 1920×1080 as an ordinary GTK client, unaware it
+  is hosted.
+- zoetrope captures that output (wlr screencopy / ext-image-copy;
+  dmabuf→EGL→GL ideally, CPU shm as v1) and maps the frames onto a
+  panel — flat quad or the existing `backdrop_mesh` cylinder; slab
+  push/pull applies unchanged.
+- **Input**: a small control socket on couch (extends its `input.py`
+  remote abstraction): zoetrope forwards prev/next/up/down/activate/
+  back as JSON lines. The same hook serves a phone remote on the TV.
+- **Playback handoff**: hosted couch delegates stereo playback —
+  `(url, stereo report)` over the socket → zoetrope theater renders
+  per-eye; progress reports flow back so couch's watch state stays the
+  source of truth. 2D content may play inside the projected panel (a
+  flat screen in space is correct for 2D).
+- **Additive-display legibility**: Adwaita-dark surfaces render as
+  transparency in-lens; dark chrome may read *well* over the glass
+  slab (bright cards/text floating on glass). Prototype on hardware
+  first; fallback is a `glass.css` variant generated from the suite
+  tokens, loaded only when hosted.
+
+**What survives in zoetrope:** stereo/window/tracking, theater +
+MovieApp, slab mesh (projection surface + backdrop), push/pull, the
+kiosk, detection. The native rails (`scene.py` rows/tiles/labels +
+`shell.py` pages) remain as the **no-couch fallback** and stop growing
+features.
+
+**Known tradeoff:** gaze-gravity cannot reach inside a projected
+texture — hosted couch is D-pad grammar (its native design). If gaze
+matters later, couch can expose focus-rect hints over the socket.
+
+**Staged plan:**
+1. Headless-output + screencopy prototype: couch visible on a curved
+   panel in-lens; validates capture path, latency, and dark-theme
+   legibility in one session. *(next)*
+2. Control socket in couch + zoetrope event forwarding.
+3. Playback-handoff IPC; progress round-trip.
+4. Default home = couch panel when couch is present; native rails
+   otherwise.
+
+**Prerequisite QA (2026-08-01):** before couch becomes the shared
+face, drive its rails with a synthetic Jellyfin dataset and fix the
+shared bug classes *once, there*: ring must fully enclose the focused
+card, focus must never scroll offscreen, titles must ellipsize/wrap
+not clip, rail headings must be visible whenever their rail is, and
+the focused rail should hold a stable vertical position (other rails
+peeking above/below).
+
 ## 9. Implementation order (maps to current code)
 
 1. Palette/type/focus pass in `apps/base.py` + `shell.py` (tokens from
